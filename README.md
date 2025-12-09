@@ -10,6 +10,7 @@ Improvements:
 
 ## Usage
 
+```c++
 #include "zmij.h"
 #include <stdio.h>
 
@@ -18,6 +19,7 @@ int main() {
   schubfach::dtoa(6.62607015e-34, buf);
   puts(buf);
 }
+```
 
 ## Performance
 
