@@ -7,6 +7,7 @@ Improvements:
 * Fewer branches
 * Faster division and modulo
 * More efficient significand and exponent output
+* Improved estimate selection
 
 ## Usage
 
