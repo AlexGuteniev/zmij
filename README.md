@@ -24,21 +24,21 @@ int main() {
 
 ## Performance
 
-More than 2.5x faster than Ryu and 80% faster than [Schubfach](https://github.com/vitaut/schubfach)
-on dtoa-benchmark.
+More than 3x faster than Ryu and ~2x faster than [Schubfach](https://github.com/vitaut/schubfach)
+on [dtoa-benchmark](https://github.com/fmtlib/dtoa-benchmark).
 
-| Function       | Time (ns) | Speedup  |
-|----------------|----------:|---------:|
-| ostringstream  | 879.662   | 1.00x    |
-| sprintf        | 737.575   | 1.19x    |
-| doubleconv     | 86.517    | 10.17x   |
-| to_chars       | 42.691    | 20.61x   |
-| ryu            | 38.072    | 23.11x   |
-| schubfach      | 24.847    | 35.40x   |
-| fmt            | 22.802    | 38.58x   |
-| dragonbox      | 20.986    | 41.92x   |
-| zmij           | 12.742    | 69.04x   |
-| null           | 0.932     | 943.49x  |
+| Function     | Time (ns) | Speedup  |
+|--------------|----------:|---------:|
+| ostringstream| 896.099   | 1.00x    |
+| sprintf      | 749.617   | 1.20x    |
+| doubleconv   | 87.886    | 10.20x   |
+| to_chars     | 43.602    | 20.55x   |
+| ryu          | 40.061    | 22.37x   |
+| schubfach    | 25.196    | 35.57x   |
+| fmt          | 23.828    | 37.61x   |
+| dragonbox    | 21.992    | 40.75x   |
+| zmij         | 12.839    | 69.79x   |
+| null         | 0.971     | 923.25x  |
 
 <img width="788" height="347" alt="image" src="https://github.com/user-attachments/assets/0e3de579-09b7-448e-b1de-b247a31c83c4" />
 
