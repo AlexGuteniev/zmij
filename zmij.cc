@@ -832,7 +832,7 @@ void dtoa(double value, char* buffer) noexcept {
     }
     // Handle subnormals.
     bin_sig ^= implicit_bit;
-    ++bin_exp;
+    bin_exp = 1;
     regular = true;
   }
   bin_sig ^= implicit_bit;
@@ -898,17 +898,14 @@ void dtoa(double value, char* buffer) noexcept {
       umul192_upper64_modified(pow10_hi, pow10_lo, bin_sig_shifted << shift);
   uint64_t dec_sig_under = scaled_sig >> 2;
   uint64_t dec_sig_over = dec_sig_under + 1;
-  bool under_in = lower <= (dec_sig_under << 2);
-  bool over_in = (dec_sig_over << 2) <= upper;
-  if (under_in != over_in) {
-    // Only one of dec_sig_under or dec_sig_over are in the rounding interval.
-    return write(buffer, under_in ? dec_sig_under : dec_sig_over, dec_exp);
-  }
 
-  // Both dec_sig_under and dec_sig_over are in the interval - pick the closest.
+  // Pick the closest of dec_sig_under and dec_sig_over and check if it's in
+  // the rounding interval.
   int64_t cmp = int64_t(scaled_sig - ((dec_sig_under + dec_sig_over) << 1));
   bool under_closer = cmp < 0 || (cmp == 0 && (dec_sig_under & 1) == 0);
-  return write(buffer, under_closer ? dec_sig_under : dec_sig_over, dec_exp);
+  bool under_in = lower <= (dec_sig_under << 2);
+  write(buffer, (under_closer & under_in) ? dec_sig_under : dec_sig_over,
+        dec_exp);
 }
 
 }  // namespace zmij
