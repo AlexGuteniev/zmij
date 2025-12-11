@@ -23,12 +23,21 @@ TEST(zmij_test, inf) {
 }
 
 TEST(zmij_test, shorter) {
-  // Schubfach would pick a shorter underestimate u'.
+  // A possibly shorter underestimate is picked (u' in Schubfach).
   EXPECT_EQ(dtoa(-4.932096661796888e-226), "-4.932096661796888e-226");
 
-  // Schubfach would pick a shorter overestimate w'.
+  // A possibly shorter overestimate is picked (w' in Schubfach).
   EXPECT_EQ(dtoa(3.439070283483335e+35), "3.439070283483335e+35");
 }
+
+TEST(zmij_test, single_candidate) {
+  // Only an underestimate is in the rounding region (u in Schubfach).
+  EXPECT_EQ(dtoa(6.606854224493745e-17), "6.606854224493745e-17");
+
+  // Only an overestimate is in the rounding region (w in Schubfach).
+  EXPECT_EQ(dtoa(6.079537928711555e+61), "6.079537928711555e+61");
+}
+
 
 auto main(int argc, char** argv) -> int {
   testing::InitGoogleTest(&argc, argv);
