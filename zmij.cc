@@ -731,11 +731,15 @@ inline auto divmod100(uint32_t value) noexcept -> div_mod_result {
   return {div, value - div * 100};
 }
 
+inline void write2digits(char* buffer, uint32_t value) noexcept {
+  memcpy(buffer, digits2(value), 2);
+}
+
 // Writes 4 digits and removes trailing zeros.
 auto write4digits(char* buffer, uint32_t value) noexcept -> char* {
   auto [aa, bb] = divmod100<4>(value);
-  memcpy(buffer + 0, digits2(aa), 2);
-  memcpy(buffer + 2, digits2(bb), 2);
+  write2digits(buffer + 0, aa);
+  write2digits(buffer + 2, bb);
   return buffer + 4 - num_trailing_zeros[bb] -
          (bb == 0) * num_trailing_zeros[aa];
 }
@@ -755,8 +759,8 @@ auto write_significand(char* buffer, uint64_t value) noexcept -> char* {
 
   *buffer = char('0' + a);
   buffer += a != 0;
-  memcpy(buffer + 0, digits2(bb), 2);
-  memcpy(buffer + 2, digits2(cc), 2);
+  write2digits(buffer + 0, bb);
+  write2digits(buffer + 2, cc);
   buffer += 4;
 
   if (ffgghhii == 0) {
@@ -767,10 +771,10 @@ auto write_significand(char* buffer, uint64_t value) noexcept -> char* {
   uint32_t ffgg = ffgghhii / 10'000;
   uint32_t hhii = ffgghhii % 10'000;
   auto [ff, gg] = divmod100<4>(ffgg);
-  memcpy(buffer + 0, digits2(dd), 2);
-  memcpy(buffer + 2, digits2(ee), 2);
-  memcpy(buffer + 4, digits2(ff), 2);
-  memcpy(buffer + 6, digits2(gg), 2);
+  write2digits(buffer + 0, dd);
+  write2digits(buffer + 2, ee);
+  write2digits(buffer + 4, ff);
+  write2digits(buffer + 6, gg);
   if (hhii != 0) return write4digits(buffer + 8, hhii);
   return buffer + 8 - num_trailing_zeros[gg] -
          (gg == 0) * num_trailing_zeros[ff];
@@ -795,7 +799,7 @@ void write(char* buffer, uint64_t dec_sig, int dec_exp) noexcept {
   auto [a, bb] = divmod100<3>(uint32_t(dec_exp));
   *buffer = char('0' + a);
   buffer += dec_exp >= 100;
-  memcpy(buffer, digits2(bb), 2);
+  write2digits(buffer, bb);
   buffer[2] = '\0';
 }
 
