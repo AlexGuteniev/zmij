@@ -720,8 +720,8 @@ struct div_mod_result {
 
 // Returns {value / 100, value % 100} correct for values of up to 4 digits.
 inline auto divmod100(uint32_t value) noexcept -> div_mod_result {
-  constexpr int exp = 19;  // 19 is faster or equal to 12 even for 3 digits.
   assert(value < 10'000);
+  constexpr int exp = 19;  // 19 is faster or equal to 12 even for 3 digits.
   constexpr int sig = (1 << exp) / 100 + 1;
   uint32_t div = (value * sig) >> exp;  // value / 100
   return {div, value - div * 100};
