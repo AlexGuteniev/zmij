@@ -873,7 +873,7 @@ void dtoa(double value, char* buffer) noexcept {
   assert(dec_exp >= -350 && dec_exp <= 350);
   // pow10_bin_exp = floor(log2(10**-dec_exp))
   int pow10_bin_exp = -dec_exp * log2_pow10_sig >> log2_pow10_exp;
-  // pow10 = ((pow10_hi << 64) | pow10_lo) * 2**(pow10_bin_exp - 126)
+  // pow10 = ((pow10_hi << 64) | pow10_lo) * 2**(pow10_bin_exp - 127)
 
   // Shift to ensure the intermediate result in umul192_upper64_modified has
   // a fixed 128-bit fractional width. For example, 3 * 2**59 and 3 * 2**60
