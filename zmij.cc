@@ -687,7 +687,7 @@ inline auto umul128(uint64_t x, uint64_t y) noexcept -> uint128_t {
 }
 
 // Computes upper 64 bits of multiplication of x and y, discards the least
-// significand bit and rounds to odd, where x = uint128_t(x_hi << 64) | x_lo.
+// significant bit and rounds to odd, where x = uint128_t(x_hi << 64) | x_lo.
 auto umul192_upper64_inexact_to_odd(uint64_t x_hi, uint64_t x_lo,
                                     uint64_t y) noexcept -> uint64_t {
   uint128_t result = umul128(x_hi, y) + (umul128(x_lo, y) >> 64);
