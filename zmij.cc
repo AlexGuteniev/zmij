@@ -694,6 +694,54 @@ auto umul192_upper64_inexact_to_odd(uint64_t x_hi, uint64_t x_lo,
   return uint64_t(result >> 64) | ((uint64_t(result) >> 1) != 0);
 }
 
+struct divmod_result {
+  uint32_t div;
+  uint32_t mod;
+};
+
+// Returns {value / 100, value % 100} correct for values of up to 4 digits.
+inline auto divmod100(uint32_t value) noexcept -> divmod_result {
+  assert(value < 10'000);
+  constexpr int exp = 19;  // 19 is faster or equal to 12 even for 3 digits.
+  constexpr int sig = (1 << exp) / 100 + 1;
+  uint32_t div = (value * sig) >> exp;  // value / 100
+  return {div, value - div * 100};
+}
+
+inline auto count_lzero(uint64_t x) noexcept -> int {
+#ifdef _MSC_VER
+  // MSVC makes _lzcnt_u64 available always, but it's not constexpr.
+  return _lzcnt_u64(x);
+#else
+  // Unlike MSVC, clang and gcc recognize this implementation and replace
+  // it with the assembly instructions which are appropriate for the
+  // target (lzcnt or bsr + zero handling).
+  int n = 64;
+  for (; x > 0; x >>= 1) --n;
+  return n;
+#endif
+}
+
+inline auto count_trailing_nonzeros(uint64_t x) noexcept -> size_t {
+  // This assumes little-endian, that is the first char of the string
+  // is in the lowest byte and the last char is in the highest byte.
+  assert(!is_big_endian());
+  // We count the number of characters until there are only '0' == 0x30
+  // characters left.
+  // The code is equivalent to
+  //   return 8 - count_lzero(x & ~0x30303030'30303030) / 8
+  // but if the BSR instruction is emitted, subtracting the constant
+  // before dividing allows combining it with the subtraction from BSR
+  // counting in the opposite direction.
+  //   return size_t(71 - count_lzero(x & ~0x30303030'30303030)) / 8;
+  // Additionally, the bsr instruction requires a zero check.  Since the
+  // high bit is never set we can avoid the zero check by shifting the
+  // datum left by one and using XOR to both remove the 0x30s and insert
+  // a sentinel bit at the end.
+  constexpr uint64_t mask_with_sentinel = (0x30303030'30303030ull << 1) | 1;
+  return size_t(70 - count_lzero((x << 1) ^ mask_with_sentinel)) / 8;
+}
+
 // Converts value in the range [0, 100) to a string. GCC generates a bit better
 // code when value is pointer-size (https://www.godbolt.org/z/5fEPMT1cc).
 inline auto digits2(size_t value) noexcept -> const char* {
@@ -720,57 +768,6 @@ auto digits8_u64(uint32_t aa, uint32_t bb, uint32_t cc, uint32_t dd) noexcept
     -> uint64_t {
   return digits2_u64(dd) << 48 | digits2_u64(cc) << 32 |
          digits2_u64(bb) << 16 | digits2_u64(aa);
-}
-
-struct divmod_result {
-  uint32_t div;
-  uint32_t mod;
-};
-
-// Returns {value / 100, value % 100} correct for values of up to 4 digits.
-inline auto divmod100(uint32_t value) noexcept -> divmod_result {
-  assert(value < 10'000);
-  constexpr int exp = 19;  // 19 is faster or equal to 12 even for 3 digits.
-  constexpr int sig = (1 << exp) / 100 + 1;
-  uint32_t div = (value * sig) >> exp;  // value / 100
-  return {div, value - div * 100};
-}
-
-inline auto count_lzero(uint64_t x) noexcept -> int {
-#ifdef _MSC_VER
-  // MSVC makes _lzcnt_u64 available always, but it's not constexpr.
-  return _lzcnt_u64(x);
-#else
-  // Unlike MSVC, clang and gcc recognize this implementation and replace
-  // it with the assembly instructions which are appropriate for the
-  // target (lzcnt or bsr + zero handling).
-  int n = 64;
-  while (x > 0) {
-    x >>= 1;
-    --n;
-  }
-  return n;
-#endif
-}
-
-inline auto count_trailing_nonzeros(uint64_t x) noexcept -> size_t {
-  // This assumes little-endian, that is the first char of the string
-  // is in the lowest byte and the last char is in the highest byte.
-  assert(!is_big_endian());
-  // We count the number of characters until there are only '0' == 0x30
-  // characters left.
-  // The code is equivalent to
-  //   return 8 - count_lzero(x & ~0x30303030'30303030) / 8
-  // but if the BSR instruction is emitted, subtracting the constant
-  // before dividing allows combining it with the subtraction from BSR
-  // counting in the opposite direction.
-  //   return size_t(71 - count_lzero(x & ~0x30303030'30303030)) / 8;
-  // Additionally, the bsr instruction requires a zero check.  Since the
-  // high bit is never set we can avoid the zero check by shifting the
-  // datum left by one and using XOR to both remove the 0x30s and insert
-  // a sentinel bit at the end.
-  constexpr uint64_t mask_with_sentinel = (0x30303030'30303030ull << 1) | 1;
-  return size_t(70 - count_lzero((x << 1) ^ mask_with_sentinel)) / 8;
 }
 
 // Writes a significand consisting of 16 or 17 decimal digits and removes
