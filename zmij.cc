@@ -722,7 +722,7 @@ inline auto count_lzero(uint64_t x) noexcept -> int {
 #endif
 }
 
-inline auto count_trailing_nonzeros(uint64_t x) noexcept -> size_t {
+inline auto count_trailing_nonzeros(uint64_t x) noexcept -> int {
   // This assumes little-endian, that is the first char of the string
   // is in the lowest byte and the last char is in the highest byte.
   assert(!is_big_endian());
@@ -739,7 +739,7 @@ inline auto count_trailing_nonzeros(uint64_t x) noexcept -> size_t {
   // datum left by one and using XOR to both remove the 0x30s and insert
   // a sentinel bit at the end.
   constexpr uint64_t mask_with_sentinel = (0x30303030'30303030ull << 1) | 1;
-  return size_t(70 - count_lzero((x << 1) ^ mask_with_sentinel)) / 8;
+  return (70u - count_lzero((x << 1) ^ mask_with_sentinel)) / 8;
 }
 
 // Converts value in the range [0, 100) to a string. GCC generates a bit better
