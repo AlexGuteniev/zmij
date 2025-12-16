@@ -679,12 +679,18 @@ inline auto umul128(uint64_t x, uint64_t y) noexcept -> uint128_t {
 #endif  // __SIZEOF_INT128__
 }
 
+inline auto umul192_upper128(uint64_t x_hi, uint64_t x_lo, uint64_t y) noexcept
+    -> uint128 {
+  uint128_t result = uint128_t(x_hi) * y + ((uint128_t(x_lo) * y) >> 64);
+  return {uint64_t(result >> 64), uint64_t(result)};
+}
+
 // Computes upper 64 bits of multiplication of x and y, discards the least
 // significant bit and rounds to odd, where x = uint128_t(x_hi << 64) | x_lo.
 auto umul192_upper64_inexact_to_odd(uint64_t x_hi, uint64_t x_lo,
                                     uint64_t y) noexcept -> uint64_t {
-  uint128_t result = umul128(x_hi, y) + (umul128(x_lo, y) >> 64);
-  return uint64_t(result >> 64) | ((uint64_t(result) >> 1) != 0);
+  auto [hi, lo] = umul192_upper128(x_hi, x_lo, y);
+  return hi | ((lo >> 1) != 0);
 }
 
 struct divmod_result {
@@ -898,31 +904,25 @@ void dtoa(double value, char* buffer) noexcept {
   int shift = bin_exp + pow10_bin_exp + 1;
 
   if (regular) {
-    uint64_t bin_sig_shifted = bin_sig << shift;
-    uint128_t bin_sig_scaled = umul128(pow10_hi, bin_sig_shifted) +
-                               (umul128(pow10_lo - 1, bin_sig_shifted) >> 64);
-
-    // The top 64-bit of bin_sig_scaled contain the integral part and the bottom
-    // ones contain the fractional part.
-    uint64_t bin_sig_scaled_hi = uint64_t(bin_sig_scaled >> 64);
-    uint64_t bin_sig_scaled_lo = uint64_t(bin_sig_scaled);
+    auto [integral, fractional] =
+        umul192_upper128(pow10_hi, pow10_lo - 1, bin_sig << shift);
+    uint64_t digit = integral % 10;
 
     constexpr int num_fractional_bits = 60;
-    uint64_t mod = bin_sig_scaled_hi % 10;
-    uint64_t full_mod = (mod << num_fractional_bits) | (bin_sig_scaled_lo >> 4);
-
+    constexpr uint64_t ten = uint64_t(10) << num_fractional_bits;
+    // Fixed-point remainder of the scaled significand modulo 10.
+    uint64_t rem10 = (digit << num_fractional_bits) | (fractional >> 4);
     uint64_t half_ulp = pow10_hi >> (5 - shift);
-    uint64_t upper = full_mod + half_ulp;
+    uint64_t upper = rem10 + half_ulp;
 
     // An optimization from yy_double by Yaoyuan Guo:
-    if ((bin_sig_scaled_lo != (uint64_t(1) << 63)) && (full_mod != half_ulp) &&
-        ((uint64_t(10) << num_fractional_bits) - upper > uint64_t(1))) {
+    if (fractional != (uint64_t(1) << 63) && rem10 != half_ulp &&
+        ten - upper > uint64_t(1)) {
       bool round = (upper >> num_fractional_bits) >= 10;
-      uint64_t shorter = (bin_sig_scaled_hi - mod) + (round ? 10 : 0);
-      uint64_t longer =
-          bin_sig_scaled_hi + (bin_sig_scaled_lo >= (uint64_t(1) << 63));
+      uint64_t shorter = integral - digit + (round ? 10 : 0);
+      uint64_t longer = integral + (fractional >= (uint64_t(1) << 63));
       return write(buffer,
-                   ((half_ulp >= full_mod) + round != 0) ? shorter : longer,
+                   ((half_ulp >= rem10) + round != 0) ? shorter : longer,
                    dec_exp);
     }
   }
