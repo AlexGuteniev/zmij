@@ -903,7 +903,7 @@ void dtoa(double value, char* buffer) noexcept {
   //   3 * 2**60 / 100 = 3.45...e+16 (shift = 2 + 1)
   int shift = bin_exp + pow10_bin_exp + 1;
 
-  if (regular) {
+  if (regular) [[likely]] {
     auto [integral, fractional] =
         umul192_upper128(pow10_hi, pow10_lo - 1, bin_sig << shift);
     uint64_t digit = integral % 10;
@@ -917,9 +917,9 @@ void dtoa(double value, char* buffer) noexcept {
 
     // An optimization from yy_double by Yaoyuan Guo:
     if (fractional != (uint64_t(1) << 63) && rem10 != half_ulp &&
-        ten - upper > uint64_t(1)) {
+        ten - upper > uint64_t(1)) [[likely]] {
       bool round = (upper >> num_fractional_bits) >= 10;
-      uint64_t shorter = integral - digit + (round ? 10 : 0);
+      uint64_t shorter = integral - digit + round * 10;
       uint64_t longer = integral + (fractional >= (uint64_t(1) << 63));
       return write(buffer,
                    ((half_ulp >= rem10) + round != 0) ? shorter : longer,
