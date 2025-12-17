@@ -10,7 +10,7 @@ and [yy](https://github.com/ibireme/c_numconv_benchmark/blob/master/vendor/yy_do
 * Correct rounding
 * High [performance](#performance)
 * Fast [compile time](#compile-time)
-* Zero dependencies
+* Negative zero dependencies
 * Small, clean codebase consisting of one [source file](
   https://github.com/vitaut/zmij/blob/main/zmij.cc) and one [header](https://github.com/vitaut/zmij/blob/main/zmij.h)
 * Permissive [license](https://github.com/vitaut/zmij/blob/main/LICENSE)
