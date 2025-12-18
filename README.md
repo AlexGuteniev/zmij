@@ -35,26 +35,23 @@ C++ standard library implementations and ~2x faster than
 [Schubfach](https://github.com/vitaut/schubfach)
 on [dtoa-benchmark](https://github.com/fmtlib/dtoa-benchmark) run on Apple M1.
 
-| Function      | Time (ns) | Speedup |
-|--------------:|----------:|--------:|
-| ostringstream | 874.752   | 1.00x   |
-| sprintf       | 734.849   | 1.19x   |
-| doubleconv    | 85.479    | 10.23x  |
-| to_chars      | 42.709    | 20.48x  |
-| ryu           | 37.404    | 23.39x  |
-| schubfach     | 25.166    | 34.76x  |
-| fmt           | 22.302    | 39.22x  |
-| dragonbox     | 20.823    | 42.01x  |
-| yy            | 14.016    | 62.41x  |
-| zmij          | 12.259    | 71.36x  |
-| null          | 0.929     | 941.19x |
+| Function            | Time (ns) | Speedup |
+|---------------------|----------:|--------:|
+| ostringstream       | 871.982   | 1.00x   |
+| sprintf             | 737.510   | 1.18x   |
+| double-conversion   | 84.304    | 10.34x  |
+| to_chars            | 42.786    | 20.38x  |
+| ryu                 | 37.081    | 23.52x  |
+| schubfach           | 24.885    | 35.04x  |
+| fmt                 | 22.274    | 39.15x  |
+| dragonbox           | 20.701    | 42.12x  |
+| yy                  | 13.974    | 62.40x  |
+| zmij                | 12.271    | 71.06x  |
+| null                | 0.930     | 937.62x |
 
-<img width="783" height="354" alt="image"
-     src="https://github.com/user-attachments/assets/7b65921b-af06-4ffa-ab31-e61e7f14abf8" />
+<img width="812" height="355" alt="image" src="https://github.com/user-attachments/assets/333f0575-8631-421b-8620-22b8a4ac9e0a" />
 
-<img width="888" height="675" alt="image"
-     src="https://github.com/user-attachments/assets/96492ad2-c8b1-4963-8ad0-a89abac4bcc4" />
-
+<img width="830" height="661" alt="image" src="https://github.com/user-attachments/assets/0e657107-fdc5-4575-bc04-4fd4ef4b0740" />
 
 ## Compile time
 
