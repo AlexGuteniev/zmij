@@ -7,6 +7,7 @@
 #endif
 
 #include <assert.h>  // assert
+#include <limits.h>  // CHAR_BIT
 #include <stdint.h>  // uint64_t
 #include <string.h>  // memcpy
 
@@ -839,18 +840,21 @@ void write(char* buffer, uint64_t dec_sig, int dec_exp) noexcept {
 namespace zmij {
 
 void dtoa(double value, char* buffer) noexcept {
+  static_assert(std::numeric_limits<double>::is_iec559);
+  constexpr int num_bits = sizeof(value) * CHAR_BIT;
   uint64_t bits = 0;
   memcpy(&bits, &value, sizeof(value));
 
   *buffer = '-';
-  buffer += bits >> 63;
+  buffer += bits >> (num_bits - 1);
 
   constexpr int num_sig_bits = std::numeric_limits<double>::digits - 1;
   constexpr uint64_t implicit_bit = uint64_t(1) << num_sig_bits;
   uint64_t bin_sig = bits & (implicit_bit - 1);  // binary significand
   bool regular = bin_sig != 0;
 
-  constexpr int exp_mask = 0x7ff;
+  constexpr int num_exp_bits = num_bits - num_sig_bits - 1;
+  constexpr int exp_mask = (1 << num_exp_bits) - 1;
   int bin_exp = int(bits >> num_sig_bits) & exp_mask;  // binary exponent
   if (((bin_exp + 1) & exp_mask) <= 1) [[unlikely]] {
     if (bin_exp != 0) {
