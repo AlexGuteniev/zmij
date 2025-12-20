@@ -964,12 +964,14 @@ void dtoa(double value, char* buffer) noexcept {
         // Exact half-ulp tie when rounding to nearest integer.
         fractional != (uint64_t(1) << 63) &&
         // Exact half-ulp tie when rounding to nearest 10.
-        rem10 != half_ulp10 && ten - upper > uint64_t(1)) [[likely]] {
+        rem10 != half_ulp10 &&
+        // Near-boundary case for rounding to nearest 10.
+        ten - upper > uint64_t(1)) [[likely]] {
       bool round = (upper >> num_fractional_bits) >= 10;
       uint64_t shorter = integral - digit + round * 10;
       uint64_t longer = integral + (fractional >= (uint64_t(1) << 63));
       return write(buffer,
-                   ((half_ulp10 >= rem10) + round != 0) ? shorter : longer,
+                   ((rem10 <= half_ulp10) + round != 0) ? shorter : longer,
                    dec_exp);
     }
   }
