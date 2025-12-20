@@ -945,14 +945,18 @@ void dtoa(double value, char* buffer) noexcept {
         umul192_upper128(pow10_hi, pow10_lo, bin_sig << exp_shift);
     uint64_t digit = integral % 10;
 
-    constexpr int num_fractional_bits = 60;
+    // Switch to a fixed-point representation with the integral part in the
+    // upper 4 bits and the rest being the fractional part.
+    constexpr int num_integral_bits = 4;
+    constexpr int num_fractional_bits = num_bits - num_integral_bits;
     constexpr uint64_t ten = uint64_t(10) << num_fractional_bits;
     // Fixed-point remainder of the scaled significand modulo 10.
-    uint64_t rem10 = (digit << num_fractional_bits) | (fractional >> 4);
+    uint64_t rem10 =
+        (digit << num_fractional_bits) | (fractional >> num_integral_bits);
     // dec_exp is chosen such that 10**dec_exp <= 2**bin_exp < 10**(dec_exp + 1)
     // Since 1ulp = 2**bin_exp it will be in the range [1, 10) after scaling by
     // 10**dec_exp.
-    uint64_t half_ulp = pow10_hi >> (5 - exp_shift);
+    uint64_t half_ulp = pow10_hi >> (num_integral_bits - exp_shift + 1);
     uint64_t upper = rem10 + half_ulp;
 
     // An optimization from yy_double by Yaoyuan Guo:
