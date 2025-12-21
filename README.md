@@ -66,7 +66,7 @@ taking the best of 3 runs.
 
 ## Other languages
 
-* Rust: https://docs.rs/zmij/latest/zmij/index.html
+* Rust: https://github.com/dtolnay/zmij
 
 ## Differences from Schubfach
 
