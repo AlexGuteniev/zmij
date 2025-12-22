@@ -1,6 +1,3 @@
-
-set(CMAKE_CTEST_ARGUMENTS "--output-on-failure")
-enable_testing()
 add_subdirectory(gtest)
 
 add_executable(zmij-test zmij-test.cc)
