@@ -927,7 +927,8 @@ auto to_decimal(uint64_t bin_sig, int bin_exp, bool regular) -> fp {
   ++pow10_lo;
 
   // Shift the significand so that boundaries are integer.
-  uint64_t bin_sig_shifted = bin_sig << 2;
+  constexpr int bound_shift = 2;
+  uint64_t bin_sig_shifted = bin_sig << bound_shift;
 
   // Compute the estimates of lower and upper bounds of the rounding interval
   // by multiplying them by the power of 10 and applying modified rounding.
@@ -939,19 +940,19 @@ auto to_decimal(uint64_t bin_sig, int bin_exp, bool regular) -> fp {
 
   // The idea of using a single shorter candidate is by Cassio Neri.
   // It is less or equal to the upper bound by construction.
-  uint64_t shorter = 10 * ((upper >> 2) / 10);
-  if ((shorter << 2) >= lower) return {shorter, dec_exp};
+  uint64_t shorter = 10 * ((upper >> bound_shift) / 10);
+  if ((shorter << bound_shift) >= lower) return {shorter, dec_exp};
 
   uint64_t scaled_sig = umul192_upper64_inexact_to_odd(
       pow10_hi, pow10_lo, bin_sig_shifted << exp_shift);
-  uint64_t dec_sig_under = scaled_sig >> 2;
+  uint64_t dec_sig_under = scaled_sig >> bound_shift;
   uint64_t dec_sig_over = dec_sig_under + 1;
 
   // Pick the closest of dec_sig_under and dec_sig_over and check if it's in
   // the rounding interval.
   int64_t cmp = int64_t(scaled_sig - ((dec_sig_under + dec_sig_over) << 1));
   bool under_closer = cmp < 0 || (cmp == 0 && (dec_sig_under & 1) == 0);
-  bool under_in = (dec_sig_under << 2) >= lower;
+  bool under_in = (dec_sig_under << bound_shift) >= lower;
   return {(under_closer & under_in) ? dec_sig_under : dec_sig_over, dec_exp};
 }
 
