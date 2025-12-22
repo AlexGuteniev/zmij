@@ -966,9 +966,9 @@ auto to_decimal(UInt bin_sig, int bin_exp, bool regular) noexcept -> fp {
 
 }  // namespace
 
-namespace zmij {
+namespace zmij::detail {
 
-void dtoa(double value, char* buffer) noexcept {
+void to_string(double value, char* buffer) noexcept {
   static_assert(std::numeric_limits<double>::is_iec559, "IEEE 754 required");
   using uint = uint64_t;
   uint bits = 0;
@@ -1028,4 +1028,4 @@ void dtoa(double value, char* buffer) noexcept {
   buffer[2] = '\0';
 }
 
-}  // namespace zmij
+}  // namespace zmij::detail
