@@ -790,7 +790,7 @@ inline auto count_trailing_nonzeros(uint64_t x) noexcept -> int {
   // high bit is never set we can avoid the zero check by shifting the
   // datum left by one and inserting a sentinel bit at the end. On my x64
   // this is a measurable speed-up over the automatically inserted range check.
-  return (70u - countl_zero((x << 1) | 1)) / 8;
+  return (70 - countl_zero((x << 1) | 1)) / 8;
 }
 
 // Converts value in the range [0, 100) to a string. GCC generates a bit better
@@ -840,7 +840,7 @@ auto write_significand(char* buffer, uint64_t value) noexcept -> char* {
   *buffer = char('0' + a);
   buffer += a != 0;
 
-  constexpr uint64_t zerobits = 0x30303030'30303030ull; // 0x30 == '0'
+  constexpr uint64_t zerobits = 0x30303030'30303030u;  // 0x30 == '0'
   uint64_t bcd = to_bcd8(bbccddee);
   uint64_t bits = bcd | zerobits;
   memcpy(buffer, &bits, 8);
@@ -1008,8 +1008,8 @@ template <typename Float> void to_string(Float value, char* buffer) noexcept {
   if (subnormal) [[unlikely]] {
     char* p = start + 1;
     while (*p == '0') ++p;
-    int num_zeros = p - (start + 1);
-    memcpy(start + 1, p, num_digits - num_zeros + 1);
+    int num_zeros = int(p - (start + 1));
+    memcpy(start + 1, p, unsigned(num_digits - num_zeros + 1));
     dec_exp -= num_zeros;
     buffer -= num_zeros;
     buffer -= buffer == start + 2;
@@ -1028,7 +1028,6 @@ template <typename Float> void to_string(Float value, char* buffer) noexcept {
   buffer[2] = '\0';
 }
 
-template void to_string<float>(float value, char* buffer) noexcept;
 template void to_string<double>(double value, char* buffer) noexcept;
 
 }  // namespace zmij::detail
