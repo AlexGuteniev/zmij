@@ -17,12 +17,12 @@ TEST(zmij_test, utilities) {
   EXPECT_EQ(countl_zero(1), 63);
   EXPECT_EQ(countl_zero(~0ull), 0);
 
-  EXPECT_EQ(count_trailing_nonzeros(0x30303030'30303030ull), 0);
-  EXPECT_EQ(count_trailing_nonzeros(0x30303030'30303031ull), 1);
-  EXPECT_EQ(count_trailing_nonzeros(0x30303030'30303039ull), 1);
-  EXPECT_EQ(count_trailing_nonzeros(0x30393030'39303030ull), 7);
-  EXPECT_EQ(count_trailing_nonzeros(0x31303030'30303030ull), 8);
-  EXPECT_EQ(count_trailing_nonzeros(0x39303030'30303030ull), 8);
+  EXPECT_EQ(count_trailing_nonzeros(0x00000000'00000000ull), 0);
+  EXPECT_EQ(count_trailing_nonzeros(0x00000000'00000001ull), 1);
+  EXPECT_EQ(count_trailing_nonzeros(0x00000000'00000009ull), 1);
+  EXPECT_EQ(count_trailing_nonzeros(0x00090000'09000000ull), 7);
+  EXPECT_EQ(count_trailing_nonzeros(0x01000000'00000000ull), 8);
+  EXPECT_EQ(count_trailing_nonzeros(0x09000000'00000000ull), 8);
 }
 
 TEST(zmij_test, umul192_upper64_inexact_to_odd) {

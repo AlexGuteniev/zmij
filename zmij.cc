@@ -764,24 +764,31 @@ inline auto countl_zero(uint64_t x) noexcept -> int {
 #endif
 }
 
+inline auto bswap64(uint64_t x) noexcept -> uint64_t {
+#ifdef _MSC_VER
+  return _byteswap_uint64(x);
+#else
+  return __builtin_bswap64(x);
+#endif
+}
+
 inline auto count_trailing_nonzeros(uint64_t x) noexcept -> int {
   // This assumes little-endian, that is the first char of the string
   // is in the lowest byte and the last char is in the highest byte.
   assert(!is_big_endian());
-  // We count the number of characters until there are only '0' == 0x30
-  // characters left.
+  // We count the number of bytes until there are only '\0's left.
   // The code is equivalent to
-  //   return 8 - countl_zero(x & ~0x30303030'30303030) / 8
-  // but if the BSR instruction is emitted, subtracting the constant
-  // before dividing allows combining it with the subtraction from BSR
-  // counting in the opposite direction.
-  //   return size_t(71 - countl_zero(x & ~0x30303030'30303030)) / 8;
-  // Additionally, the bsr instruction requires a zero check.  Since the
+  //   return 8 - count_lzero(x) / 8
+  // but if the BSR instruction is emitted (as gcc on x64 does with
+  // default settings), subtracting the constant before dividing allows
+  // the compiler to combine it with the subtraction which it inserts
+  // due to BSR counting in the opposite direction.
+  //
+  // Additionally, the BSR instruction requires a zero check.  Since the
   // high bit is never set we can avoid the zero check by shifting the
-  // datum left by one and using XOR to both remove the 0x30s and insert
-  // a sentinel bit at the end.
-  constexpr uint64_t mask_with_sentinel = (0x30303030'30303030ull << 1) | 1;
-  return (70u - countl_zero((x << 1) ^ mask_with_sentinel)) / 8;
+  // datum left by one and inserting a sentinel bit at the end. On my x64
+  // this is a measurable speed-up over the automatically inserted range check.
+  return (70u - countl_zero((x << 1) | 1)) / 8;
 }
 
 // Converts value in the range [0, 100) to a string. GCC generates a bit better
@@ -798,18 +805,22 @@ inline auto digits2(size_t value) noexcept -> const char* {
   return &data[value * 2];
 }
 
-inline auto digits2_u64(uint32_t value) noexcept -> uint64_t {
-  uint16_t digits;
-  memcpy(&digits, digits2(value), 2);
-  return digits;
-}
-
-// Converts the value `aa * 10**6 + bb * 10**4 + cc * 10**2 + dd` to a string
-// returned as a 64-bit integer.
-auto digits8_u64(uint32_t aa, uint32_t bb, uint32_t cc, uint32_t dd) noexcept
-    -> uint64_t {
-  return digits2_u64(dd) << 48 | digits2_u64(cc) << 32 | digits2_u64(bb) << 16 |
-         digits2_u64(aa);
+uint64_t to_bcd8(uint64_t abcdefgh) {
+  // Three steps BCD.  Base 10000 -> base 100 -> base 10.
+  // div and mod are evaluated simultaneously as, e.g.
+  //   (abcdefgh / 10000) << 32 + (abcdefgh % 10000)
+  //      == abcdefgh + (2^32 - 10000) * (abcdefgh / 10000)))
+  // where the division on the RHS is implemented by the usual multiply + shift
+  // trick and the fractional bits are masked away.
+  uint64_t abcd_efgh =
+      abcdefgh + (0x100000000 - 10000) * ((abcdefgh * 0x68db8bb) >> 40);
+  uint64_t ab_cd_ef_gh =
+      abcd_efgh +
+      (0x10000 - 100) * (((abcd_efgh * 0x147b) >> 19) & 0x7f0000007f);
+  uint64_t a_b_c_d_e_f_g_h =
+      ab_cd_ef_gh +
+      (0x100 - 10) * (((ab_cd_ef_gh * 0x67) >> 10) & 0xf000f000f000f);
+  return is_big_endian() ? a_b_c_d_e_f_g_h : bswap64(a_b_c_d_e_f_g_h);
 }
 
 // Writes a significand consisting of 16 or 17 decimal digits and removes
@@ -819,36 +830,29 @@ auto write_significand(char* buffer, uint64_t value) noexcept -> char* {
   // digit a can be zero.
   uint32_t abbccddee = uint32_t(value / 100'000'000);
   uint32_t ffgghhii = uint32_t(value % 100'000'000);
-  uint32_t abbcc = abbccddee / 10'000;
-  uint32_t ddee = abbccddee % 10'000;
-  uint32_t abb = abbcc / 100;
-  uint32_t cc = abbcc % 100;
-  auto [a, bb] = divmod100(abb);
-  auto [dd, ee] = divmod100(ddee);
+  uint32_t a = abbccddee / 100'000'000;
+  uint32_t bbccddee = abbccddee % 100'000'000;
 
   char* start = buffer;
   *buffer = char('0' + a);
   buffer += a != 0;
 
-  // Use an intermediate uint64_t to make sure that the compiler constructs
-  // the value in a register. This way the buffer is written to memory in
-  // one go and count_trailing_nonzeros doesn't have to load from memory.
-  uint64_t digits = digits8_u64(bb, cc, dd, ee);
-  memcpy(buffer, &digits, 8);
+  // 0x30 == '0'
+  constexpr uint64_t zerobits = 0x30303030'30303030ull;
+
+  uint64_t bcd = to_bcd8(bbccddee);
+  uint64_t bits = bcd | zerobits;
+  memcpy(buffer, &bits, 8);
   if (ffgghhii == 0) {
-    buffer += count_trailing_nonzeros(digits);
+    buffer += count_trailing_nonzeros(bcd);
     buffer -= (buffer - start == 1) ? 1 : 0;
     return buffer;
   }
-
   buffer += 8;
-  uint32_t ffgg = ffgghhii / 10'000;
-  uint32_t hhii = ffgghhii % 10'000;
-  auto [ff, gg] = divmod100(ffgg);
-  auto [hh, ii] = divmod100(hhii);
-  digits = digits8_u64(ff, gg, hh, ii);
-  memcpy(buffer, &digits, 8);
-  return buffer + count_trailing_nonzeros(digits);
+  bcd = to_bcd8(ffgghhii);
+  bits = bcd | zerobits;
+  memcpy(buffer, &bits, 8);
+  return buffer + count_trailing_nonzeros(bcd);
 }
 
 constexpr int num_bits = sizeof(double) * CHAR_BIT;
