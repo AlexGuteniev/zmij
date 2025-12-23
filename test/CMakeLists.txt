@@ -10,3 +10,6 @@ target_compile_features(zmij-no-int128-test PRIVATE ${ZMIJ_STANDARD})
 target_compile_definitions(zmij-no-int128-test PRIVATE ZMIJ_USE_INT128=0)
 target_link_libraries(zmij-no-int128-test gtest)
 add_test(NAME zmij-no-int128-test COMMAND zmij-no-int128-test)
+
+add_executable(verify verify.cc)
+target_link_libraries(verify zmij)

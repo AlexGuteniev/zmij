@@ -4,6 +4,7 @@ project(zmij CXX)
 set(ZMIJ_STANDARD cxx_std_17)
 
 add_library(zmij zmij.cc zmij.h)
+target_include_directories(zmij PUBLIC .)
 target_compile_features(zmij PRIVATE ${ZMIJ_STANDARD})
 
 add_executable(example example.cc)
