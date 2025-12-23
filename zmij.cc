@@ -16,7 +16,7 @@
 #include <limits>       // std::numeric_limits
 #include <type_traits>  // std::conditional_t
 
-#if __has_include(<arm_neon.h>)
+#ifdef __ARM_NEON
 #  include <arm_neon.h>
 #endif
 
@@ -835,7 +835,7 @@ inline void write8(char* buffer, uint64_t value) { memcpy(buffer, &value, 8); }
 // Writes a significand consisting of up to 17 decimal digits (16-17 for
 // normals) and removes trailing zeros.
 auto write_significand17(char* buffer, uint64_t value) noexcept -> char* {
-#ifndef __ARM_NEON__
+#ifndef __ARM_NEON
   // Each digit is denoted by a letter so value is abbccddeeffgghhii.
   uint32_t abbccddee = uint32_t(value / 100'000'000);
   uint32_t ffgghhii = uint32_t(value % 100'000'000);
@@ -857,7 +857,7 @@ auto write_significand17(char* buffer, uint64_t value) noexcept -> char* {
   bcd = to_bcd8(ffgghhii);
   write8(buffer, bcd | zerobits);
   return buffer + count_trailing_nonzeros(bcd);
-#else   // __ARM_NEON__
+#else   // __ARM_NEON
   // An optimized version for NEON by Dougall Johnson.
   struct to_string_constants {
     uint64_t mul_const;
