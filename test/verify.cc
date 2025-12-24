@@ -7,7 +7,7 @@
 #include <stdio.h>   // printf
 #include <string.h>  // memcpy
 
-#include <charconv>
+#include "dragonbox/dragonbox_to_chars.cpp"
 
 #include "zmij.h"
 
@@ -24,12 +24,11 @@ int main() {
     memcpy(&f, &bits, sizeof(float));
 
     zmij::to_string(f, actual);
-    *std::to_chars(expected, expected + 32, f, std::chars_format::scientific)
-         .ptr = '\0';
+    *jkj::dragonbox::to_chars(f, expected) = '\0';
 
     if (strcmp(actual, expected) == 0) continue;
-    if (strcmp(actual, "0") == 0 && strcmp(expected, "0e+00") == 0) continue;
-    if (strcmp(actual, "-0") == 0 && strcmp(expected, "-0e+00") == 0) continue;
+    if (strcmp(actual, "0") == 0 && strcmp(expected, "0e0") == 0) continue;
+    if (strcmp(actual, "-0") == 0 && strcmp(expected, "-0e0") == 0) continue;
     if (strcmp(actual, "nan") == 0 && strncmp(expected, "nan", 3) == 0)
       continue;
     if (strcmp(actual, "-nan") == 0 && strncmp(expected, "-nan", 4) == 0)

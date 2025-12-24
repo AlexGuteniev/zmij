@@ -12,5 +12,6 @@ target_link_libraries(zmij-no-int128-test gtest)
 add_test(NAME zmij-no-int128-test COMMAND zmij-no-int128-test)
 
 add_executable(verify verify.cc)
+target_include_directories(verify PRIVATE .)
 target_compile_features(verify PRIVATE cxx_std_20)
 target_link_libraries(verify zmij)
