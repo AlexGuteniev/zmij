@@ -11,6 +11,7 @@ with implementations in C and C++
 * Correct rounding
 * High [performance](#performance)
 * Fast [compile time](#compile-time)
+* IEEE 754 `double` and `float` support
 * Negative zero dependencies
 * Small, clean codebase consisting of one [source file](
   https://github.com/vitaut/zmij/blob/main/zmij.cc) and one [header](https://github.com/vitaut/zmij/blob/main/zmij.h)
