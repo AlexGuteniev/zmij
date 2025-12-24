@@ -19,11 +19,11 @@ int main() {
     if (i % 50'000'000 == 0) printf("Progress: %.2f%%\n", i * percent);
 
     uint32_t bits = i++;
-    float f = 0;
-    memcpy(&f, &bits, sizeof(float));
+    float value = 0;
+    memcpy(&value, &bits, sizeof(float));
 
-    zmij::to_string(f, actual);
-    *jkj::dragonbox::to_chars(f, expected) = '\0';
+    zmij::to_string(value, actual);
+    *jkj::dragonbox::to_chars(value, expected) = '\0';
 
     if (strcmp(actual, expected) == 0) continue;
     if (strcmp(actual, "0") == 0 && strcmp(expected, "0e0") == 0) continue;

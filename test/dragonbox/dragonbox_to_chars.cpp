@@ -491,12 +491,12 @@ namespace JKJ_NAMESPACE {
 
                 // Print exponent and return
                 if (exponent < 0) {
-                    stdr::memcpy(buffer, "E-", 2);
+                    stdr::memcpy(buffer, "e-", 2);
                     buffer += 2;
                     exponent = -exponent;
                 }
                 else {
-                    buffer[0] = 'E';
+                    buffer[0] = 'e';
                     buffer += 1;
                 }
 
