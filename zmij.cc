@@ -1119,18 +1119,16 @@ template <typename Float> void to_string(Float value, char* buffer) noexcept {
   char* start = buffer;
   int num_digits = std::numeric_limits<Float>::max_digits10 - 2;
   if (num_bits == 64) {
-    num_digits += (dec_sig >= uint(1e16));
+    dec_exp += num_digits + (dec_sig >= uint(1e16));
     buffer = write_significand17(buffer + 1, dec_sig);
   } else {
     if (dec_sig < uint(1e7)) [[unlikely]] {
       dec_sig *= 10;
       --dec_exp;
     }
-    num_digits += (dec_sig >= uint(1e8));
+    dec_exp += num_digits + (dec_sig >= uint(1e8));
     buffer = write_significand9(buffer + 1, dec_sig);
   }
-  dec_exp += num_digits;
-
   start[0] = start[1];
   start[1] = '.';
 
