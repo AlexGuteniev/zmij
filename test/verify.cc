@@ -2,7 +2,6 @@
 // Copyright (c) 2025 - present, Victor Zverovich
 // Distributed under the MIT license (see LICENSE).
 
-#include <math.h>    // isnan
 #include <stdint.h>  // uint32_t
 #include <stdio.h>   // printf
 #include <string.h>  // memcpy
