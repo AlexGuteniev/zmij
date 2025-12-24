@@ -98,6 +98,8 @@ TEST(dtoa_test, all_exponents) {
 TEST(ftoa_test, normal) {
   EXPECT_EQ(ftoa(6.62607e-34f), "6.62607e-34");
   EXPECT_EQ(ftoa(9.061488e15f), "9.061488e+15");
+  EXPECT_EQ(ftoa(1.342178e+08f), "1.342178e+08");
+  EXPECT_EQ(ftoa(1.3421781e+08f), "1.3421781e+08");
 }
 
 TEST(ftoa_test, subnormal) {

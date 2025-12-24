@@ -886,19 +886,19 @@ auto write_significand17(char* buffer, uint64_t value) noexcept -> char* {
   // Compiler barrier, or clang narrows the load to 32-bit and unpairs it.
   asm("" : "+r"(hundred_million));
 
-  // Equivalent to hi = value / 100000000, lo = value % 100000000.
-  uint64_t hi = (__uint128_t(value) * c->mul_const) >> 90;
-  uint64_t lo = value - hi * hundred_million;
+  // Equivalent to abbccddee = value / 100000000, ffgghhii = value % 100000000.
+  uint64_t abbccddee = (__uint128_t(value) * c->mul_const) >> 90;
+  uint64_t ffgghhii = value - abbccddee * hundred_million;
 
   // We could probably make this bit faster, but we're preferring to
   // reuse the constants for now.
-  uint64_t top = (__uint128_t(hi) * c->mul_const) >> 90;
-  hi -= top * hundred_million;
+  uint64_t a = (__uint128_t(abbccddee) * c->mul_const) >> 90;
+  abbccddee -= a * hundred_million;
 
   char* start = buffer;
-  buffer = write_if_nonzero(buffer, top);
+  buffer = write_if_nonzero(buffer, a);
 
-  uint64x1_t hundredmillions = {hi | (uint64_t(lo) << 32)};
+  uint64x1_t hundredmillions = {abbccddee | (uint64_t(ffgghhii) << 32)};
 
   int32x2_t high_10000 =
       vshr_n_u32(vqdmulh_n_s32(hundredmillions, c->multipliers32[0]), 9);
@@ -978,15 +978,23 @@ auto to_decimal(UInt bin_sig, int bin_exp, bool regular) noexcept -> fp {
   int exp_shift = bin_exp + pow10_bin_exp + 1;
 
   if (regular) [[likely]] {
-    auto [integral, fractional] =
-        umul192_upper128(pow10_hi, pow10_lo, bin_sig << exp_shift);
+    constexpr int num_bits = sizeof(UInt) * CHAR_BIT;
+    uint64_t integral = 0, fractional = 0;
+    if (num_bits == 64) {
+      auto [i, f] = umul192_upper128(pow10_hi, pow10_lo, bin_sig << exp_shift);
+      integral = i;
+      fractional = f;
+    } else {
+      uint128_t result = umul128(pow10_hi, bin_sig << exp_shift);
+      integral = uint64_t(result >> 64);
+      fractional = uint64_t(result) & ~uint64_t{0xffffffff};
+    }
     uint64_t digit = integral % 10;
 
-    // Switch to a fixed-point representation with the integral part in the
-    // upper 4 bits and the rest being the fractional part.
-    constexpr int num_bits = sizeof(uint64_t) * CHAR_BIT;
-    constexpr int num_integral_bits = 4;
-    constexpr int num_fractional_bits = num_bits - num_integral_bits;
+    // Switch to a fixed-point representation with the least significant
+    // integral digit in the upper bits and fractional digits in the lower bits.
+    constexpr int num_integral_bits = num_bits == 64 ? 4 : 32;
+    constexpr int num_fractional_bits = 64 - num_integral_bits;
     constexpr uint64_t ten = uint64_t(10) << num_fractional_bits;
     // Fixed-point remainder of the scaled significand modulo 10.
     uint64_t rem10 =
@@ -1000,7 +1008,7 @@ auto to_decimal(UInt bin_sig, int bin_exp, bool regular) noexcept -> fp {
     // An optimization from yy by Yaoyuan Guo:
     if (
         // Exact half-ulp tie when rounding to nearest integer.
-        fractional != (uint64_t(1) << (num_bits - 1)) &&
+        fractional != (uint64_t(1) << 63) &&
         // Exact half-ulp tie when rounding to nearest 10.
         rem10 != half_ulp10 &&
         // Near-boundary case for rounding to nearest 10.
@@ -1008,7 +1016,7 @@ auto to_decimal(UInt bin_sig, int bin_exp, bool regular) noexcept -> fp {
       bool round = (upper >> num_fractional_bits) >= 10;
       uint64_t shorter = integral - digit + round * 10;
       uint64_t longer =
-          integral + (fractional >= (uint64_t(1) << (num_bits - 1)));
+          integral + (fractional >= (uint64_t(1) << 63));
       return {((rem10 <= half_ulp10) + round != 0) ? shorter : longer, dec_exp};
     }
   }
