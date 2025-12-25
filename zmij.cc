@@ -20,7 +20,7 @@
 #endif
 
 #ifdef _MSC_VER
-#  include <intrin.h>  // lzcnt/adc/umul128/umulh
+#  include <intrin.h>  // __lzcnt64/_umul128/__umulh
 #endif
 
 #ifdef __clang__
