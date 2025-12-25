@@ -51,7 +51,6 @@ int main() {
         printf("Output mismatch: %s != %s\n", actual, expected);
         return;
       }
-      while (i != 0);
     });
   }
 
