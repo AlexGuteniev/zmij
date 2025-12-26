@@ -28,6 +28,10 @@
 #  pragma clang diagnostic ignored "-Wc++17-extensions"
 #endif
 
+#ifndef ZMIJ_USE_SIMD
+#  define ZMIJ_USE_SIMD 1
+#endif
+
 namespace {
 
 struct uint128 {
@@ -860,7 +864,7 @@ constexpr uint64_t zeros = 0x30303030'30303030u;  // 0x30 == '0'
 // Writes a significand consisting of up to 17 decimal digits (16-17 for
 // normals) and removes trailing zeros.
 auto write_significand17(char* buffer, uint64_t value) noexcept -> char* {
-#ifndef __ARM_NEON
+#if !defined(__ARM_NEON) || !ZMIJ_USE_SIMD
   char* start = buffer;
   // Each digit is denoted by a letter so value is abbccddeeffgghhii.
   uint32_t abbccddee = uint32_t(value / 100'000'000);
