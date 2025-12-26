@@ -1117,9 +1117,14 @@ auto write(Float value, char* buffer) noexcept -> size_t {
 
   bool subnormal = false;
   if (((bin_exp + 1) & exp_mask) <= 1) [[unlikely]] {
-    if (bin_exp != 0)
-      return void(memcpy(buffer, !bin_sig ? "inf" : "nan", 4)), 3;
-    if (bin_sig == 0) return void(memcpy(buffer, "0", 2)), 1;
+    if (bin_exp != 0) {
+      memcpy(buffer, bin_sig == 0 ? "inf" : "nan", 4);
+      return 3;
+    }
+    if (bin_sig == 0) {
+      memcpy(buffer, "0", 2);
+      return 1;
+    }
     // Handle subnormals.
     bin_sig |= implicit_bit;
     bin_exp = 1;

@@ -25,9 +25,9 @@ enum {
 inline auto write(char* out, size_t n, double value) noexcept -> size_t {
   if (n >= double_buffer_size) return detail::write(value, out);
   char buffer[double_buffer_size];
-  size_t r = detail::write(value, buffer);
+  size_t result = detail::write(value, buffer);
   memcpy(out, buffer, n);
-  return r;
+  return result;
 }
 
 /// Writes the shortest correctly rounded decimal representation of `value` to
@@ -35,9 +35,9 @@ inline auto write(char* out, size_t n, double value) noexcept -> size_t {
 inline auto write(char* out, size_t n, float value) noexcept -> size_t {
   if (n >= float_buffer_size) return detail::write(value, out);
   char buffer[float_buffer_size];
-  size_t r = detail::write(value, buffer);
+  size_t result = detail::write(value, buffer);
   memcpy(out, buffer, n);
-  return r;
+  return result;
 }
 
 }  // namespace zmij
