@@ -86,6 +86,32 @@ TEST(dtoa_test, subnormal) {
   EXPECT_EQ(dtoa(1.234e-320), "1.234e-320");
 }
 
+TEST(dtoa_test, all_irregular) {
+  for (uint64_t exp = 1; exp < 0x3ff; ++exp) {
+    uint64_t bits = exp << 52;
+    double value = 0;
+    memcpy(&value, &bits, sizeof(double));
+
+    char expected[32] = {};
+    *jkj::dragonbox::to_chars(value, expected) = '\0';
+
+    EXPECT_EQ(dtoa(value), expected);
+  }
+}
+
+TEST(dtoa_test, all_exponents) {
+  for (uint64_t exp = 0; exp <= 0x3ff; ++exp) {
+    uint64_t bits = (exp << 52) | 1;
+    double value = 0;
+    memcpy(&value, &bits, sizeof(double));
+
+    char expected[32] = {};
+    *jkj::dragonbox::to_chars(value, expected) = '\0';
+
+    EXPECT_EQ(dtoa(value), expected);
+  }
+}
+
 TEST(dtoa_test, small_int) { EXPECT_EQ(dtoa(1), "1e+00"); }
 
 TEST(dtoa_test, zero) {
@@ -117,19 +143,6 @@ TEST(dtoa_test, single_candidate) {
 
   // Only an overestimate is in the rounding region (w in Schubfach).
   EXPECT_EQ(dtoa(6.079537928711555e+61), "6.079537928711555e+61");
-}
-
-TEST(dtoa_test, all_exponents) {
-  for (uint64_t exp = 0; exp <= 0x3ff; ++exp) {
-    uint64_t bits = (exp << 52) | 1;
-    double value = 0;
-    memcpy(&value, &bits, sizeof(double));
-
-    char expected[32] = {};
-    *jkj::dragonbox::to_chars(value, expected) = '\0';
-
-    EXPECT_EQ(dtoa(value), expected);
-  }
 }
 
 TEST(ftoa_test, normal) {
