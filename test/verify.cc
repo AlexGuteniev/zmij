@@ -1,4 +1,5 @@
-// A verifier for https://github.com/vitaut/zmij/.
+// A program to verify correctness of https://github.com/vitaut/zmij/
+// on all floats.
 // Copyright (c) 2025 - present, Victor Zverovich
 // Distributed under the MIT license (see LICENSE).
 
