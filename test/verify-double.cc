@@ -35,7 +35,7 @@ const uint64_t pow10[] = {
     10000000000000000,
 };
 
-void verify(uint64_t bits) {
+auto verify(uint64_t bits) -> bool {
   double value = 0;
   memcpy(&value, &bits, sizeof(double));
 
@@ -51,8 +51,8 @@ void verify(uint64_t bits) {
 
   bool subnormal = false;
   if (((bin_exp + 1) & exp_mask) <= 1) [[unlikely]] {
-    if (bin_exp != 0) return;
-    if (bin_sig == 0) return;
+    if (bin_exp != 0) return false;
+    if (bin_sig == 0) return false;
     // Handle subnormals.
     bin_sig |= implicit_bit;
     bin_exp = 1;
@@ -78,12 +78,13 @@ void verify(uint64_t bits) {
   }
 
   if (actual.sig == expected.significand && actual.exp == expected.exponent)
-    return;
+    return true;
 
   using ullong = unsigned long long;
   printf("Output mismatch for %.17g: %llu * 10**%d != %llu * 10**%d\n", value,
          ullong(actual.sig), actual.exp, ullong(expected.significand),
          expected.exponent);
+  return false;
 }
 
 }  // namespace
@@ -98,6 +99,7 @@ auto main() -> int {
   unsigned num_threads = std::thread::hardware_concurrency();
   std::vector<std::thread> threads(num_threads);
   std::atomic<unsigned long long> num_processed_doubles(0);
+  std::atomic<unsigned long long> num_errors(0);
   printf("Using %u threads\n", num_threads);
 
   auto start = std::chrono::steady_clock::now();
@@ -105,7 +107,8 @@ auto main() -> int {
     uint64_t begin = bits | (num_significands * i / num_threads);
     uint64_t end = bits | (num_significands * (i + 1) / num_threads);
     uint64_t n = end - begin;
-    threads[i] = std::thread([i, begin, n, &num_processed_doubles] {
+    threads[i] = std::thread([i, begin, n, &num_processed_doubles,
+                              &num_errors] {
       printf("Thread %d processing 0x%013llx - 0x%013llx\n", i, begin,
              begin + n - 1);
       constexpr double percent = 100.0 / num_significands;
@@ -124,7 +127,7 @@ auto main() -> int {
             }
           }
         }
-        verify(begin + j);
+        if (!verify(begin + j)) ++num_errors;
       }
     });
   }
@@ -132,6 +135,8 @@ auto main() -> int {
   auto finish = std::chrono::steady_clock::now();
 
   using seconds = std::chrono::duration<double>;
-  printf("Tested %llu values in %.2f seconds\n", num_processed_doubles.load(),
+  printf("%llu errors in %llu values in %.2f seconds\n", num_errors.load(),
+         num_processed_doubles.load(),
          std::chrono::duration_cast<seconds>(finish - start).count());
+  return num_errors != 0 ? 1 : 0;
 }

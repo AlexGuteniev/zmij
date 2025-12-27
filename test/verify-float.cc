@@ -19,7 +19,7 @@ auto main() -> int {
   unsigned num_threads = std::thread::hardware_concurrency();
   std::vector<std::thread> threads(num_threads);
   std::atomic<unsigned long long> num_processed_floats(0);
-  std::atomic<uint32_t> num_errors(0);
+  std::atomic<unsigned long long> num_errors(0);
   printf("Using %u threads\n", num_threads);
 
   auto start = std::chrono::steady_clock::now();
