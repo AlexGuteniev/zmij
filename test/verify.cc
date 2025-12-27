@@ -23,7 +23,7 @@ int main() {
     return 1;
   }
 
-  std::atomic<bool> has_error = false;
+  std::atomic<bool> has_error(false);
   std::vector<std::thread> threads(concurrency);
   for (uint32_t i = 0; i < concurrency; ++i) {
     uint32_t start = static_cast<uint32_t>(num_floats * i / concurrency);
