@@ -55,7 +55,7 @@ inline auto verify(uint64_t bits, int bin_exp, int dec_exp, int exp_shift,
   // fast path.
   uint64_t bin_sig = (bits & (implicit_bit - 1)) | implicit_bit;
   uint64_t bin_sig_shifted = bin_sig << exp_shift;
-  uint64_t scaled_sig_lo = uint64_t(umul128(pow10_lo, bin_sig_shifted));
+  uint64_t scaled_sig_lo = pow10_lo * bin_sig_shifted;
   bool carry = scaled_sig_lo + bin_sig_shifted < scaled_sig_lo;
   if (!carry) return true;
 
