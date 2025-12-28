@@ -1059,17 +1059,16 @@ auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
     uint64_t upper = scaled_sig_mod10 + scaled_half_ulp;
 
     // An optimization from yy by Yaoyuan Guo:
-    int64_t cmp = int64_t(fractional - (uint64_t(1) << 63));
     if (
         // Exact half-ulp tie when rounding to nearest integer.
-        cmp != 0 &&
+        fractional != (uint64_t(1) << 63) &&
         // Exact half-ulp tie when rounding to nearest 10.
         scaled_sig_mod10 != scaled_half_ulp &&
         // Near-boundary case for rounding to nearest 10.
         ten - upper > uint64_t(1)) [[ZMIJ_LIKELY]] {
       bool round_up = (upper >> num_fractional_bits) >= 10;
       uint64_t shorter = integral - digit + round_up * 10;
-      uint64_t longer = integral + (cmp >= 0);
+      uint64_t longer = integral + (fractional >= (uint64_t(1) << 63));
       bool use_shorter = (scaled_sig_mod10 <= scaled_half_ulp) + round_up != 0;
       return {use_shorter ? shorter : longer, dec_exp};
     }
