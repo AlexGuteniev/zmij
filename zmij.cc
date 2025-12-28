@@ -104,7 +104,7 @@ using uint128_t = uint128;
 // 128-bit significands of powers of 10 rounded down.
 // Generated with gen-pow10.py.
 constexpr int dec_exp_min = -292;
-const uint128 pow10_significands[] = {
+constexpr uint128 pow10_significands[] = {
     {0xff77b1fcbebcdc4f, 0x25e8e89c13bb0f7a},  // -292
     {0x9faacf3df73609b1, 0x77b191618c54e9ac},  // -291
     {0xc795830d75038c1d, 0xd59df5b9ef6a2417},  // -290
