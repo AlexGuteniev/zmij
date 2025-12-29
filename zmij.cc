@@ -1021,12 +1021,7 @@ constexpr ZMIJ_INLINE auto compute_exp_shift(int bin_exp, int dec_exp) noexcept
   return bin_exp + pow10_bin_exp + 1;
 }
 
-struct fp {
-  uint64_t sig;
-  int exp;
-};
-
-template <int num_bits> auto normalize(fp dec, bool subnormal) noexcept -> fp {
+template <int num_bits> auto normalize(zmij::fp dec, bool subnormal) noexcept -> zmij::fp {
   if (!subnormal) [[ZMIJ_LIKELY]]
     return dec;
   while (dec.sig < (num_bits == 64 ? uint64_t(1e16) : uint64_t(1e8))) {
@@ -1040,7 +1035,7 @@ template <int num_bits> auto normalize(fp dec, bool subnormal) noexcept -> fp {
 // representation.
 template <typename UInt>
 auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
-                bool subnormal) noexcept -> fp {
+                bool subnormal) noexcept -> zmij::fp {
   int dec_exp = compute_dec_exp(bin_exp, regular);
   int exp_shift = compute_exp_shift(bin_exp, dec_exp);
   auto [pow10_hi, pow10_lo] = pow10_significands[-dec_exp - dec_exp_min];
@@ -1132,7 +1127,39 @@ auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
 
 }  // namespace
 
-namespace zmij::detail {
+namespace zmij {
+
+auto to_decimal(double value) -> fp {
+  static_assert(std::numeric_limits<double>::is_iec559, "IEEE 754 required");
+  uint64_t bits = 0;
+  memcpy(&bits, &value, sizeof(value));
+
+  constexpr int num_sig_bits = std::numeric_limits<double>::digits - 1;
+  constexpr uint64_t implicit_bit = uint64_t(1) << num_sig_bits;
+  uint64_t bin_sig = bits & (implicit_bit - 1);  // binary significand
+  bool regular = bin_sig != 0;
+
+  constexpr int num_exp_bits = 64 - num_sig_bits - 1;
+  constexpr int exp_mask = (1 << num_exp_bits) - 1;
+  constexpr int exp_bias = (1 << (num_exp_bits - 1)) - 1;
+  int bin_exp = int(bits >> num_sig_bits) & exp_mask;  // binary exponent
+
+  bool subnormal = false;
+  if (((bin_exp + 1) & exp_mask) <= 1) [[ZMIJ_UNLIKELY]] {
+    if (bin_exp != 0) return {~0ull, 0};
+    if (bin_sig == 0) return {0, 0};
+    // Handle subnormals.
+    regular = true;
+    bin_sig |= implicit_bit;
+    bin_exp = 1;
+    subnormal = true;
+  }
+  bin_sig ^= implicit_bit;
+  bin_exp -= num_sig_bits + exp_bias;
+  return ::to_decimal(bin_sig, bin_exp, regular, subnormal);
+}
+
+namespace detail {
 
 // It is slightly faster to return a pointer to the end than the size.
 template <typename Float>
@@ -1177,7 +1204,7 @@ auto write(Float value, char* buffer) noexcept -> char* {
   bin_sig ^= implicit_bit;
   bin_exp -= num_sig_bits + exp_bias;
 
-  auto [dec_sig, dec_exp] = to_decimal(bin_sig, bin_exp, regular, subnormal);
+  auto [dec_sig, dec_exp] = ::to_decimal(bin_sig, bin_exp, regular, subnormal);
   char* start = buffer;
   int num_digits = std::numeric_limits<Float>::max_digits10 - 2;
   if (num_bits == 64) {
@@ -1209,4 +1236,5 @@ auto write(Float value, char* buffer) noexcept -> char* {
 template auto write(double value, char* buffer) noexcept -> char*;
 template auto write(float value, char* buffer) noexcept -> char*;
 
+}  // namespace detail
 }  // namespace zmij::detail

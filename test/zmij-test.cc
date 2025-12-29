@@ -133,6 +133,12 @@ TEST(dtoa_test, no_buffer) {
   EXPECT_EQ(result, "6.62607015e-34");
 }
 
+TEST(dtoa_test, to_decimal) {
+  zmij::fp dec = zmij::to_decimal(6.62607015e-34);
+  EXPECT_EQ(dec.sig, 66260701500000000);
+  EXPECT_EQ(dec.exp, -50);
+}
+
 TEST(ftoa_test, normal) {
   EXPECT_EQ(ftoa(6.62607e-34f), "6.62607e-34");
   EXPECT_EQ(ftoa(1.342178e+08f), "1.342178e+08");
