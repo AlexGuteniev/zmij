@@ -1021,7 +1021,8 @@ constexpr ZMIJ_INLINE auto compute_exp_shift(int bin_exp, int dec_exp) noexcept
   return bin_exp + pow10_bin_exp + 1;
 }
 
-template <int num_bits> auto normalize(zmij::fp dec, bool subnormal) noexcept -> zmij::fp {
+template <int num_bits>
+auto normalize(zmij::fp dec, bool subnormal) noexcept -> zmij::fp {
   if (!subnormal) [[ZMIJ_LIKELY]]
     return dec;
   while (dec.sig < (num_bits == 64 ? uint64_t(1e16) : uint64_t(1e8))) {
@@ -1237,4 +1238,4 @@ template auto write(double value, char* buffer) noexcept -> char*;
 template auto write(float value, char* buffer) noexcept -> char*;
 
 }  // namespace detail
-}  // namespace zmij::detail
+}  // namespace zmij
