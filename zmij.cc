@@ -103,6 +103,33 @@ using uint128_t = unsigned __int128;
 using uint128_t = uint128;
 #endif  // ZMIJ_USE_INT128
 
+template <typename Float> struct float_traits {
+  static_assert(std::numeric_limits<Float>::is_iec559, "IEEE 754 required");
+
+  static constexpr int num_bits =
+      std::numeric_limits<Float>::digits == 53 ? 64 : 32;
+  static constexpr int num_sig_bits = std::numeric_limits<Float>::digits - 1;
+  static constexpr int num_exp_bits = num_bits - num_sig_bits - 1;
+  static constexpr int exp_mask = (1 << num_exp_bits) - 1;
+  static constexpr int exp_bias = (1 << (num_exp_bits - 1)) - 1;
+
+  using uint = std::conditional_t<num_bits == 64, uint64_t, uint32_t>;
+  static constexpr uint implicit_bit = uint(1) << num_sig_bits;
+
+  static auto to_bits(Float value) noexcept -> uint {
+    uint64_t bits;
+    memcpy(&bits, &value, sizeof(value));
+    return bits;
+  }
+
+  static auto get_sig(uint bits) noexcept -> uint {
+    return bits & (implicit_bit - 1);
+  }
+  static auto get_exp(uint bits) noexcept -> int {
+    return int(bits >> num_sig_bits) & exp_mask;
+  }
+};
+
 // 128-bit significands of powers of 10 rounded down.
 // Generated with gen-pow10.py.
 constexpr int dec_exp_min = -292;
@@ -1126,34 +1153,16 @@ auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
   return normalize<num_bits>({dec_sig, dec_exp}, subnormal);
 }
 
-template <typename Float> struct float_traits {
-  static_assert(std::numeric_limits<Float>::is_iec559, "IEEE 754 required");
-
-  static constexpr int num_bits =
-      std::numeric_limits<Float>::digits == 53 ? 64 : 32;
-  static constexpr int num_sig_bits = std::numeric_limits<Float>::digits - 1;
-  static constexpr int num_exp_bits = num_bits - num_sig_bits - 1;
-  static constexpr int exp_mask = (1 << num_exp_bits) - 1;
-  static constexpr int exp_bias = (1 << (num_exp_bits - 1)) - 1;
-
-  using uint = std::conditional_t<num_bits == 64, uint64_t, uint32_t>;
-  static constexpr uint implicit_bit = uint(1) << num_sig_bits;
-};
-
 }  // namespace
 
 namespace zmij {
 
-auto to_decimal(double value) -> fp {
+auto to_decimal(double value) noexcept -> fp {
   using traits = float_traits<double>;
-  uint64_t bits = 0;
-  memcpy(&bits, &value, sizeof(value));
-
-  uint64_t bin_sig = bits & (traits::implicit_bit - 1);  // binary significand
+  uint64_t bits = traits::to_bits(value);
+  uint64_t bin_sig = traits::get_sig(bits);  // binary significand
   bool regular = bin_sig != 0;
-
-  int bin_exp =
-      int(bits >> traits::num_sig_bits) & traits::exp_mask;  // binary exponent
+  int bin_exp = traits::get_exp(bits);  // binary exponent
   bool subnormal = false;
   if (((bin_exp + 1) & traits::exp_mask) <= 1) [[ZMIJ_UNLIKELY]] {
     if (bin_exp != 0) return {~0ull, 0};
@@ -1176,17 +1185,15 @@ template <typename Float>
 auto write(Float value, char* buffer) noexcept -> char* {
   using traits = float_traits<Float>;
   using uint = typename traits::uint;
-  uint bits = 0;
-  memcpy(&bits, &value, sizeof(value));
+  uint bits = traits::to_bits(value);
 
   *buffer = '-';
   buffer += bits >> (traits::num_bits - 1);
 
-  uint bin_sig = bits & (traits::implicit_bit - 1);  // binary significand
+  uint bin_sig = traits::get_sig(bits);  // binary significand
   bool regular = bin_sig != 0;
 
-  int bin_exp =
-      int(bits >> traits::num_sig_bits) & traits::exp_mask;  // binary exponent
+  int bin_exp = traits::get_exp(bits);  // binary exponent
   bool subnormal = false;
   if (((bin_exp + 1) & traits::exp_mask) <= 1) [[ZMIJ_UNLIKELY]] {
     if (bin_exp != 0) {
@@ -1208,7 +1215,10 @@ auto write(Float value, char* buffer) noexcept -> char* {
   bin_sig ^= traits::implicit_bit;
   bin_exp -= traits::num_sig_bits + traits::exp_bias;
 
+  // Here be 🐉s.
   auto [dec_sig, dec_exp] = ::to_decimal(bin_sig, bin_exp, regular, subnormal);
+
+  // Write significand.
   char* start = buffer;
   int num_digits = std::numeric_limits<Float>::max_digits10 - 2;
   if (traits::num_bits == 64) {
@@ -1225,6 +1235,7 @@ auto write(Float value, char* buffer) noexcept -> char* {
   start[0] = start[1];
   start[1] = '.';
 
+  // Write exponent.
   *buffer++ = 'e';
   *buffer++ = '-' + (dec_exp >= 0) * ('+' - '-');
   int mask = (dec_exp >= 0) - 1;

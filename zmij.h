@@ -21,7 +21,7 @@ struct fp {
 };
 
 /// Converts `value` into the shortest decimal representation `sig * 10**exp`.
-auto to_decimal(double value) -> fp;
+auto to_decimal(double value) noexcept -> fp;
 
 enum {
   double_buffer_size = 25,
