@@ -6,6 +6,13 @@
 
 #if __has_include("zmij.h")
 #  include "zmij.h"
+#else
+namespace zmij {
+struct dec_fp {
+  uint64_t sig;
+  int exp;
+};
+}  // namespace zmij
 #endif
 
 #include <assert.h>  // assert
@@ -1038,14 +1045,8 @@ constexpr ZMIJ_INLINE auto compute_exp_shift(int bin_exp, int dec_exp) noexcept
   return bin_exp + pow10_bin_exp + 1;
 }
 
-// Don't use dec_fp to allow headerless config and unsigned significand.
-struct fp {
-  uint64_t sig;
-  int exp;
-};
-
 template <int num_bits>
-auto normalize(fp dec, bool subnormal) noexcept -> fp {
+auto normalize(zmij::dec_fp dec, bool subnormal) noexcept -> zmij::dec_fp {
   if (!subnormal) [[ZMIJ_LIKELY]]
     return dec;
   while (dec.sig < (num_bits == 64 ? uint64_t(1e16) : uint64_t(1e8))) {
@@ -1059,7 +1060,7 @@ auto normalize(fp dec, bool subnormal) noexcept -> fp {
 // representation.
 template <typename UInt>
 ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
-                            bool subnormal) noexcept -> fp {
+                            bool subnormal) noexcept -> zmij::dec_fp {
   int dec_exp = compute_dec_exp(bin_exp, regular);
   int exp_shift = compute_exp_shift(bin_exp, dec_exp);
   auto [pow10_hi, pow10_lo] = pow10_significands[-dec_exp - dec_exp_min];
@@ -1105,8 +1106,8 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
         // Near-boundary case for rounding to nearest 10.
         ten - upper > 1u) [[ZMIJ_LIKELY]] {
       bool round_up = upper >= ten;
-      uint64_t shorter = integral - digit + round_up * 10;
-      uint64_t longer = integral + (fractional >= half_ulp);
+      int64_t shorter = int64_t(integral - digit + round_up * 10);
+      int64_t longer = int64_t(integral + (fractional >= half_ulp));
       bool use_shorter = (scaled_sig_mod10 <= scaled_half_ulp) + round_up != 0;
       return {use_shorter ? shorter : longer, dec_exp};
     }
@@ -1132,7 +1133,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
   // It is less or equal to the upper bound by construction.
   UInt shorter = 10 * ((upper >> bound_shift) / 10);
   if ((shorter << bound_shift) >= lower)
-    return normalize<num_bits>({shorter, dec_exp}, subnormal);
+    return normalize<num_bits>({int64_t(shorter), dec_exp}, subnormal);
 
   UInt scaled_sig = umul_upper_inexact_to_odd(pow10_hi, pow10_lo,
                                               bin_sig_shifted << exp_shift);
@@ -1146,7 +1147,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
   bool below_closer = cmp < 0 || (cmp == 0 && (dec_sig_below & 1) == 0);
   bool below_in = (dec_sig_below << bound_shift) >= lower;
   UInt dec_sig = (below_closer & below_in) ? dec_sig_below : dec_sig_above;
-  return normalize<num_bits>({dec_sig, dec_exp}, subnormal);
+  return normalize<num_bits>({int64_t(dec_sig), dec_exp}, subnormal);
 }
 
 }  // namespace
@@ -1164,10 +1165,10 @@ auto to_decimal(double value) noexcept -> dec_fp {
     if (bin_exp != 0) return {std::numeric_limits<long long>::max(), 0};
     if (bin_sig == 0) return {0, 0};
     // Handle subnormals.
-    regular = true;
     bin_sig |= traits::implicit_bit;
     bin_exp = 1;
     subnormal = true;
+    regular = true;
   }
   bin_sig ^= traits::implicit_bit;
   bin_exp -= traits::num_sig_bits + traits::exp_bias;
@@ -1201,12 +1202,11 @@ auto write(Float value, char* buffer) noexcept -> char* {
       return buffer + 1;
     }
     // Handle subnormals.
-    // Setting regular is not redundant: it avoids extra data dependencies
-    // and register pressure on the hot path (measurable perf impact).
-    regular = true;
     bin_sig |= traits::implicit_bit;
     bin_exp = 1;
     subnormal = true;
+    // Setting regular is not redundant: it has a measurable perf impact.
+    regular = true;
   }
   bin_sig ^= traits::implicit_bit;
   bin_exp -= traits::num_sig_bits + traits::exp_bias;
