@@ -1060,12 +1060,12 @@ auto normalize(zmij::dec_fp dec, bool subnormal) noexcept -> zmij::dec_fp {
 template <typename UInt>
 ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
                             bool subnormal) noexcept -> zmij::dec_fp {
-  int dec_exp = compute_dec_exp(bin_exp, regular);
-  int exp_shift = compute_exp_shift(bin_exp, dec_exp);
-  auto [pow10_hi, pow10_lo] = pow10_significands[-dec_exp - dec_exp_min];
-
   constexpr int num_bits = std::numeric_limits<UInt>::digits;
   if (regular & !subnormal) [[ZMIJ_LIKELY]] {
+    int dec_exp = compute_dec_exp(bin_exp, true);
+    int exp_shift = compute_exp_shift(bin_exp, dec_exp);
+    auto [pow10_hi, pow10_lo] = pow10_significands[-dec_exp - dec_exp_min];
+
     UInt integral = 0;        // integral part of bin_sig * pow10
     uint64_t fractional = 0;  // fractional part of bin_sig * pow10
     if (num_bits == 64) {
@@ -1119,6 +1119,10 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
       return {use_shorter ? shorter : longer, dec_exp};
     }
   }
+
+  int dec_exp = compute_dec_exp(bin_exp, regular);
+  int exp_shift = compute_exp_shift(bin_exp, dec_exp);
+  auto [pow10_hi, pow10_lo] = pow10_significands[-dec_exp - dec_exp_min];
 
   // Fallback to Schubfach to guarantee correctness in boundary cases and
   // switch to strict overestimates of powers of 10.
