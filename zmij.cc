@@ -1082,7 +1082,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
     // Relies on range calculation: (max_bin_sig << max_exp_shift) * max_u128.
     uint64_t div10 = (uint128_t(integral) * 0x199999999999999a) >> 64;
     uint64_t digit = integral - div10 * 10;
-    asm("" : "+r"(digit)); // or it narrows to 32-bit and doesn't use madd/msub
+    asm("" : "+r"(digit));  // or it narrows to 32-bit and doesn't use madd/msub
 #else
     uint64_t digit = integral % 10;
 #endif
@@ -1248,17 +1248,19 @@ auto write(Float value, char* buffer) noexcept -> char* {
   buffer += 2;
   int mask = (dec_exp >= 0) - 1;
   dec_exp = ((dec_exp + mask) ^ mask);  // absolute value
-  if constexpr (traits::min_exponent10 < -99 || traits::max_exponent10 > 99) {
-    // 19 is faster or equal to 12 even for 3 digits.
-    constexpr int div_exp = 19;
-    constexpr int div_sig = (1 << div_exp) / 100 + 1;
-    uint32_t a = (uint32_t(dec_exp) * div_sig) >> div_exp;  // value / 100
-    *buffer = char('0' + a);
-    buffer += dec_exp >= 100;
-    dec_exp -= a * 100;
+  if constexpr (traits::min_exponent10 >= -99 && traits::max_exponent10 <= 99) {
+    memcpy(buffer, digits2(dec_exp), 2);
+    buffer[2] = '\0';
+    return buffer + 2;
   }
-  memcpy(buffer, digits2(dec_exp), 2);
-  buffer[2] = '\0';
+  // 19 is faster or equal to 12 even for 3 digits.
+  constexpr int div_exp = 19, div_sig = (1 << div_exp) / 100 + 1;
+  uint32_t a = (uint32_t(dec_exp) * div_sig) >> div_exp;  // value / 100
+  uint32_t a_with_nuls = '0' + a;
+  if (is_big_endian()) a_with_nuls <<= 24;
+  memcpy(buffer, &a_with_nuls, 4);
+  buffer += dec_exp >= 100;
+  memcpy(buffer, digits2(dec_exp - a * 100), 2);
   return buffer + 2;
 }
 
