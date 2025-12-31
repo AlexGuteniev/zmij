@@ -39,7 +39,7 @@ struct dec_fp {
 #  define ZMIJ_USE_SIMD 1
 #endif
 
-#if defined(__has_builtin) and !defined(ZMIJ_NO_BUILTINS)
+#if defined(__has_builtin) && !defined(ZMIJ_NO_BUILTINS)
 #  define ZMIJ_HAS_BUILTIN(x) __has_builtin(x)
 #else
 #  define ZMIJ_HAS_BUILTIN(x) 0
