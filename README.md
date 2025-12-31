@@ -40,22 +40,22 @@ on [dtoa-benchmark](https://github.com/fmtlib/dtoa-benchmark) run on Apple M1.
 
 | Function            | Time (ns) | Speedup |
 |---------------------|----------:|--------:|
-| ostringstream       | 876.371   | 1.00x   |
-| sprintf             | 735.924   | 1.19x   |
-| double-conversion   | 85.654    | 10.23x  |
-| asteria             | 71.738    | 12.22x  |
-| to_chars            | 42.857    | 20.45x  |
-| ryu                 | 37.821    | 23.17x  |
-| schubfach           | 24.809    | 35.32x  |
-| fmt                 | 22.316    | 39.27x  |
-| dragonbox           | 20.724    | 42.29x  |
-| yy                  | 14.095    | 62.18x  |
-| zmij                | 10.546    | 83.10x  |
-| null                | 0.939     | 933.48x |
+| ostringstream       |   874.884 |   1.00× |
+| sprintf             |   743.801 |   1.18× |
+| double-conversion   |    83.519 |  10.48× |
+| to_chars            |    43.672 |  20.03× |
+| ryu                 |    36.865 |  23.73× |
+| schubfach           |    24.879 |  35.16× |
+| fmt                 |    22.338 |  39.17× |
+| dragonbox           |    20.641 |  42.39× |
+| yy                  |    14.335 |  61.03× |
+| xjb64               |    10.724 |  81.58× |
+| zmij                |    10.087 |  86.73× |
+| null                |     0.930 | 940.73× |
 
-<img width="802" height="348" alt="image" src="https://github.com/user-attachments/assets/96858bc0-ef8a-4201-950e-f666b69b83a8" />
+<img width="804" height="350" alt="image" src="https://github.com/user-attachments/assets/389d7e77-1ed2-4988-9521-1f6dbffbc77f" />
 
-<img width="813" height="657" alt="image" src="https://github.com/user-attachments/assets/558fe101-7138-442b-a7ff-7710fd61f2d6" />
+<img width="835" height="672" alt="image" src="https://github.com/user-attachments/assets/3d1224d8-1efa-47ee-b5b4-4ed3179bc799" />
 
 ## Compile time
 
