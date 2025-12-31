@@ -15,7 +15,7 @@ with implementations in C and C++
 * Safer API than classic `dtoa`
 * Negative zero dependencies
 * Small, clean codebase consisting of one [source file](
-  https://github.com/vitaut/zmij/blob/main/zmij.cc) and one [header](https://github.com/vitaut/zmij/blob/main/zmij.h)
+  https://github.com/vitaut/zmij/blob/main/zmij.cc) and an optional [header](https://github.com/vitaut/zmij/blob/main/zmij.h)
 * Permissive [license](https://github.com/vitaut/zmij/blob/main/LICENSE)
 
 ## Usage
