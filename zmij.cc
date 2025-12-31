@@ -73,6 +73,48 @@ struct dec_fp {
 
 namespace {
 
+inline auto is_big_endian() noexcept -> bool {
+  int n = 1;
+  return *reinterpret_cast<char*>(&n) != 1;
+}
+
+inline auto bswap64(uint64_t x) noexcept -> uint64_t {
+#if ZMIJ_HAS_BUILTIN(__builtin_bswap64)
+  return __builtin_bswap64(x);
+#elif defined(_MSC_VER)
+  return _byteswap_uint64(x);
+#else
+  return ((x & 0xff00000000000000) >> 56) | ((x & 0x00ff000000000000) >> 40) |
+         ((x & 0x0000ff0000000000) >> 24) | ((x & 0x000000ff00000000) >> +8) |
+         ((x & 0x00000000ff000000) << +8) | ((x & 0x0000000000ff0000) << 24) |
+         ((x & 0x000000000000ff00) << 40) | ((x & 0x00000000000000ff) << 56);
+#endif
+}
+
+inline auto clz(uint64_t x) noexcept -> int {
+  assert(x != 0);
+#if ZMIJ_HAS_BUILTIN(__builtin_clzll)
+  return __builtin_clzll(x);
+#elif defined(_MSC_VER) && defined(__AVX2__) && defined(_M_AMD64)
+  // Use lzcnt only on AVX2-capable CPUs that have this BMI instruction.
+  return __lzcnt64(x);
+#elif defined(_MSC_VER) && (defined(_M_AMD64) || defined(_M_ARM64))
+  unsigned long idx;
+  _BitScanReverse64(&idx, x);  // Fallback to the BSR instruction.
+  return 63 - idx;
+#elif defined(_MSC_VER)
+  // Fallback to the 32-bit BSR instruction.
+  unsigned long idx;
+  if (_BitScanReverse(&idx, uint32_t(x >> 32))) return 31 - idx;
+  _BitScanReverse(&idx, uint32_t(x));
+  return 63 - idx;
+#else
+  int n = 64;
+  for (; x > 0; x >>= 1) --n;
+  return n;
+#endif
+}
+
 struct uint128 {
   uint64_t hi;
   uint64_t lo;
@@ -117,32 +159,6 @@ using uint128_t = unsigned __int128;
 #else
 using uint128_t = uint128;
 #endif  // ZMIJ_USE_INT128
-
-template <typename Float> struct float_traits : std::numeric_limits<Float> {
-  static_assert(float_traits::is_iec559, "IEEE 754 required");
-
-  static constexpr int num_bits = float_traits::digits == 53 ? 64 : 32;
-  static constexpr int num_sig_bits = float_traits::digits - 1;
-  static constexpr int num_exp_bits = num_bits - num_sig_bits - 1;
-  static constexpr int exp_mask = (1 << num_exp_bits) - 1;
-  static constexpr int exp_bias = (1 << (num_exp_bits - 1)) - 1;
-
-  using sig_type = std::conditional_t<num_bits == 64, uint64_t, uint32_t>;
-  static constexpr sig_type implicit_bit = sig_type(1) << num_sig_bits;
-
-  static auto to_bits(Float value) noexcept -> sig_type {
-    uint64_t bits;
-    memcpy(&bits, &value, sizeof(value));
-    return bits;
-  }
-
-  static auto get_sig(sig_type bits) noexcept -> sig_type {
-    return bits & (implicit_bit - 1);
-  }
-  static auto get_exp(sig_type bits) noexcept -> int {
-    return int(bits >> num_sig_bits) & exp_mask;
-  }
-};
 
 // Computes 128-bit result of multiplication of two 64-bit unsigned integers.
 constexpr auto umul128(uint64_t x, uint64_t y) noexcept -> uint128_t {
@@ -199,6 +215,32 @@ auto umul_upper_inexact_to_odd(uint64_t x_hi, uint64_t, uint32_t y) noexcept
   return uint32_t(result >> 32) | ((uint32_t(result) >> 1) != 0);
 }
 
+template <typename Float> struct float_traits : std::numeric_limits<Float> {
+  static_assert(float_traits::is_iec559, "IEEE 754 required");
+
+  static constexpr int num_bits = float_traits::digits == 53 ? 64 : 32;
+  static constexpr int num_sig_bits = float_traits::digits - 1;
+  static constexpr int num_exp_bits = num_bits - num_sig_bits - 1;
+  static constexpr int exp_mask = (1 << num_exp_bits) - 1;
+  static constexpr int exp_bias = (1 << (num_exp_bits - 1)) - 1;
+
+  using sig_type = std::conditional_t<num_bits == 64, uint64_t, uint32_t>;
+  static constexpr sig_type implicit_bit = sig_type(1) << num_sig_bits;
+
+  static auto to_bits(Float value) noexcept -> sig_type {
+    uint64_t bits;
+    memcpy(&bits, &value, sizeof(value));
+    return bits;
+  }
+
+  static auto get_sig(sig_type bits) noexcept -> sig_type {
+    return bits & (implicit_bit - 1);
+  }
+  static auto get_exp(sig_type bits) noexcept -> int {
+    return int(bits >> num_sig_bits) & exp_mask;
+  }
+};
+
 // 128-bit significands of powers of 10 rounded down.
 // Generated using 192-bit arithmetic method by Dougall Johnson.
 constexpr struct pow10_significands_table {
@@ -237,48 +279,6 @@ constexpr struct pow10_significands_table {
 } pow10_significands;
 
 constexpr int dec_exp_min = -292;
-
-inline auto is_big_endian() noexcept -> bool {
-  int n = 1;
-  return *reinterpret_cast<char*>(&n) != 1;
-}
-
-inline auto clz(uint64_t x) noexcept -> int {
-  assert(x != 0);
-#if ZMIJ_HAS_BUILTIN(__builtin_clzll)
-  return __builtin_clzll(x);
-#elif defined(_MSC_VER) && defined(__AVX2__) && defined(_M_AMD64)
-  // Use lzcnt only on AVX2-capable CPUs that have this BMI instruction.
-  return __lzcnt64(x);
-#elif defined(_MSC_VER) && (defined(_M_AMD64) || defined(_M_ARM64))
-  unsigned long idx;
-  _BitScanReverse64(&idx, x);  // Fallback to the BSR instruction.
-  return 63 - idx;
-#elif defined(_MSC_VER)
-  // Fallback to the 32-bit BSR instruction.
-  unsigned long idx;
-  if (_BitScanReverse(&idx, uint32_t(x >> 32))) return 31 - idx;
-  _BitScanReverse(&idx, uint32_t(x));
-  return 63 - idx;
-#else
-  int n = 64;
-  for (; x > 0; x >>= 1) --n;
-  return n;
-#endif
-}
-
-inline auto bswap64(uint64_t x) noexcept -> uint64_t {
-#if ZMIJ_HAS_BUILTIN(__builtin_bswap64)
-  return __builtin_bswap64(x);
-#elif defined(_MSC_VER)
-  return _byteswap_uint64(x);
-#else
-  return ((x & 0xff00000000000000) >> 56) | ((x & 0x00ff000000000000) >> 40) |
-         ((x & 0x0000ff0000000000) >> 24) | ((x & 0x000000ff00000000) >> +8) |
-         ((x & 0x00000000ff000000) << +8) | ((x & 0x0000000000ff0000) << 24) |
-         ((x & 0x000000000000ff00) << 40) | ((x & 0x00000000000000ff) << 56);
-#endif
-}
 
 inline auto count_trailing_nonzeros(uint64_t x) noexcept -> int {
   // We count the number of bytes until there are only zeros left.
