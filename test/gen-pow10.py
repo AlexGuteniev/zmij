@@ -53,7 +53,7 @@ def gen_shifts():
         print(f"\\{exp_shift}", end="")
     print('"')
 
-if sys.argv[1] == 'shifts':
+if 'shifts' in sys.argv:
     gen_shifts()
 else:
     get_pow10()

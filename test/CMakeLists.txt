@@ -1,5 +1,3 @@
-set(ZMIJ_VERIFIER_STANDARD cxx_std_20)
-
 add_subdirectory(gtest)
 
 add_library(dragonbox dragonbox/dragonbox_to_chars.cpp)
@@ -20,11 +18,17 @@ target_compile_definitions(zmij-no-int128-test PRIVATE ZMIJ_USE_INT128=0)
 add_zmij_test(zmij-no-simd-test)
 target_compile_definitions(zmij-no-simd-test PRIVATE ZMIJ_USE_SIMD=0)
 
+add_executable(pow10-test pow10-test.cc)
+add_test(NAME pow10-test COMMAND pow10-test)
+target_link_libraries(pow10-test gtest)
+
+set(ZMIJ_CHECK_STANDARD cxx_std_20)
+
 add_executable(float-check float-check.cc)
-target_compile_features(float-check PRIVATE ${ZMIJ_VERIFIER_STANDARD})
+target_compile_features(float-check PRIVATE ${ZMIJ_CHECK_STANDARD})
 target_include_directories(float-check PRIVATE .)
 target_link_libraries(float-check dragonbox zmij)
 
 add_executable(double-check double-check.cc)
-target_compile_features(double-check PRIVATE ${ZMIJ_VERIFIER_STANDARD})
+target_compile_features(double-check PRIVATE ${ZMIJ_CHECK_STANDARD})
 target_include_directories(double-check PRIVATE .)
