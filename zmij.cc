@@ -642,7 +642,6 @@ auto write(Float value, char* buffer) noexcept -> char* {
       return buffer + 1;
     }
     bin_exp = 1 - traits::num_sig_bits - traits::exp_bias;
-    dec_exp = compute_dec_exp(bin_exp, true);
     bin_sig |= traits::implicit_bit;
     // Setting regular is not redundant: it has a measurable perf impact.
     regular = true;
