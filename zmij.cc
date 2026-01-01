@@ -241,7 +241,7 @@ template <typename Float> struct float_traits : std::numeric_limits<Float> {
 
 // 128-bit significands of powers of 10 rounded down.
 // Generated using 192-bit arithmetic method by Dougall Johnson.
-constexpr struct pow10_significands_table {
+struct pow10_significands_table {
   uint128 data[617];
 
   constexpr const uint128& operator[](int dec_exp) const {
@@ -277,7 +277,8 @@ constexpr struct pow10_significands_table {
         current = {c0 << 1, c1 << 1 | c0 >> 63, c2 << 1 | c1 >> 63};
     }
   }
-} pow10_significands;
+};
+constexpr pow10_significands_table pow10_significands;
 
 inline auto count_trailing_nonzeros(uint64_t x) noexcept -> int {
   // We count the number of bytes until there are only zeros left.
