@@ -2,8 +2,6 @@
 // Copyright (c) 2025 - present, Victor Zverovich
 // Distributed under the MIT license (see LICENSE).
 
-#include "double-check.h"
-
 #include <stdint.h>  // uint32_t
 #include <stdio.h>   // printf
 #include <string.h>  // memcpy
@@ -14,6 +12,7 @@
 
 #include "../zmij.cc"
 #include "dragonbox/dragonbox.h"
+#include "modular-search.h"
 
 namespace {
 
@@ -144,14 +143,13 @@ auto main() -> int {
       constexpr double percent = 100.0 / num_significands;
 
       uint64_t scaled_sig_lo = pow10_lo * (bin_sig_begin << exp_shift);
-      uint64_t scaled_step = pow10_lo * (1 << exp_shift);
+      constexpr uint64_t scaled_step = pow10_lo * (1 << exp_shift);
       uint64_t max_bin_sig_shifted = (bin_sig_end - 1) << exp_shift;
 
       // Finds all numbers greater or equal to 1**64 - max_bin_sig_shifted in
       // start + d * i sequence without enumerating the whole sequence.
       if (true) {
         uint64_t start = scaled_sig_lo;
-        uint64_t d = scaled_step;
         uint64_t count = bin_sig_end - bin_sig_begin;
         uint64_t threshold = ~uint64_t() - max_bin_sig_shifted + 1;
         unsigned long long total_n = 0;
@@ -163,7 +161,7 @@ auto main() -> int {
           if (start < threshold) {
             // Target is [threshold - start, 2**64 - 1 - start].
             // This range will never wrap because start < threshold.
-            n = find_min_n(d, uint128_t(1) << 64, threshold - start,
+            n = find_min_n<scaled_step, uint128_t(1) << 64>(threshold - start,
                            ~uint64_t() - start);
             if (n == not_found) {
               fprintf(stderr, "Failed to find the next hit\n");
@@ -173,21 +171,20 @@ auto main() -> int {
 
           ++hits_found;
           total_n += n;
-          uint64_t hit_val = start + n * d;
+          uint64_t hit_val = start + n * scaled_step;
 
           if (total_n >= count) {
             printf("Fast check found %d special cases in %lld values\n",
                    hits_found, total_n);
             break;
           }
-          //printf("Found fast: %llx %llx\n", hit_val, bin_sig_begin + total_n);
           ++num_current_special_cases;
           uint64_t bin_sig = bin_sig_begin + total_n;
           uint64_t bits = exp_bits | (bin_sig ^ traits::implicit_bit);
           if (!verify(bits, bin_sig, bin_exp)) ++num_errors;
 
           // Advance: To find the next hit, we must move at least one step.
-          start = hit_val + d;
+          start = hit_val + scaled_step;
           ++total_n;
 
           num_processed_doubles += total_n - first_unreported;
@@ -202,7 +199,7 @@ auto main() -> int {
         }
       } else {
         for (uint64_t bin_sig = bin_sig_begin; bin_sig < bin_sig_end;
-            ++bin_sig, scaled_sig_lo += scaled_step) {
+             ++bin_sig, scaled_sig_lo += scaled_step) {
           if ((bin_sig % (1 << 24)) == 0) [[unlikely]] {
             if (scaled_sig_lo != pow10_lo * (bin_sig << exp_shift)) {
               fprintf(stderr, "Sanity check failed\n");
