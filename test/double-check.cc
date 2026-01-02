@@ -94,6 +94,8 @@ int find_min_n(uint64_t a, uint128_t b, uint64_t lower, uint64_t upper) {
   return (res * b + lower + a - 1) / a;
 }
 
+// Finds all numbers greater or equal to 0xff100000'00000000 in [x0, x0 + count)
+// without enumerating the whole sequence.
 void fast_check(uint64_t x0, uint64_t d, uint64_t count) {
   uint64_t threshold = 0xff100000'00000000;
   int current_n_offset = 0;
