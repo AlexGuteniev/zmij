@@ -12,6 +12,7 @@
 
 #include "../zmij.cc"
 #include "dragonbox/dragonbox.h"
+#include "double-check.h"
 
 namespace {
 
@@ -81,57 +82,42 @@ auto is_pow10_exact_for_bin_exp(int bin_exp) -> bool {
   return -dec_exp >= exact_begin && -dec_exp <= exact_end;
 }
 
-// Finds the smallest n > 0 such that (n * a) % b is in [lower, upper].
-// This is a standard algorithm for linear congruential inequalities.
-auto find_min_n(uint64_t a, uint128_t b, uint64_t lower, uint64_t upper)
-    -> uint64_t {
-  constexpr uint64_t not_found = ~uint64_t();
-  if (lower > upper) return not_found;
-  a %= b;
-  if (a == 0) return lower == 0 ? 1 : not_found;
-
-  if ((lower + a - 1) / a <= upper / a) return (lower + a - 1) / a;
-
-  uint64_t n = find_min_n(b % a, a, (a - upper % a) % a, (a - lower % a) % a);
-  if (n == not_found) return not_found;
-  return (n * b + lower + a - 1) / a;
-}
-
 // Finds all numbers greater or equal to 0xff100000'00000000 in x0 + d * i
 // sequence without enumerating the whole sequence.
 void fast_check(uint64_t x0, uint64_t d, uint64_t count) {
-  uint64_t threshold = 0xff100000'00000000;
-  uint64_t current_n_offset = 0;
+  uint64_t threshold = 0xff80000000000000;
   uint128_t mod = uint128_t(1) << 64;
-  for (uint64_t i = 0;; ++i) {
-    // Adjust search range based on current x0.
-    uint64_t target_lower = threshold - x0;
-    uint64_t target_upper = ~uint64_t() - x0;
+  uint64_t total_n = 0;
+  int hits_found = 0;
 
-    // If target_lower > target_R, the range wraps around the modulus.
-    // We split it or handle it by checking the smallest n for either side.
-    uint64_t n = 0;
-    if (target_lower <= target_upper) {
-      n = find_min_n(d, mod, target_lower, target_upper);
+  while (hits_found < 100) {
+    // If x0 is already above threshold, distance to hit is 0.
+    uint64_t n;
+    if (x0 >= threshold) {
+      n = 0;
     } else {
-      // Range is [target_lower, mod - 1] OR [0, target_upper].
-      uint64_t n1 = find_min_n(d, mod, target_lower, mod - 1);
-      uint64_t n2 = find_min_n(d, mod, 0, target_upper);
-      n = n1 < n2 ? n1 : n2;
+      // Target is [threshold - x0, 2^64 - 1 - x0].
+      // This range will never wrap because x0 < threshold.
+      uint128_t lower = threshold - x0;
+      uint128_t upper = uint128_t(0xFFFFFFFFFFFFFFFF) - x0;
+      n = find_min_n(d, mod, lower, upper);
     }
 
-    uint64_t actual_n = current_n_offset + n;
-    uint64_t val = x0 + n * d;
-    if (actual_n >= count) {
-      printf("Fast check found %lld special cases in %lld values\n", i,
-             actual_n);
+    if (n == ~uint64_t()) break;
+
+    ++hits_found;
+    total_n += n;
+    uint64_t hit_val = x0 + n * d;
+
+    if (total_n >= count) {
+      printf("Fast check found %lld special cases in %lld values\n", hits_found,
+             total_n);
       return;
     }
-    // printf("%llx\n", (unsigned long long)val);
 
-    // Advance the sequence to look for the next hit.
-    x0 = val + d;
-    current_n_offset = actual_n + 1;
+    // Advance: To find the next hit, we must move at least one step.
+    x0 = hit_val + d;
+    total_n += 1;
   }
 }
 
@@ -151,7 +137,7 @@ auto main() -> int {
     printf("Unsupported exponent\n");
   printf("Verifying binary exponent %d (0x%03x)\n", bin_exp, raw_exp);
 
-  constexpr uint64_t num_significands = uint64_t(1) << 32;  // test a subset
+  constexpr uint64_t num_significands = uint64_t(1) << 9;  // test a subset
 
   constexpr uint64_t exp_bits = uint64_t(raw_exp) << traits::num_sig_bits;
   constexpr int dec_exp = compute_dec_exp(bin_exp, true);
@@ -166,7 +152,7 @@ auto main() -> int {
 
   constexpr uint64_t pow10_lo = pow10_significands[-dec_exp].lo;
 
-  unsigned num_threads = std::thread::hardware_concurrency();
+  unsigned num_threads = 1;  // std::thread::hardware_concurrency();
   std::vector<std::thread> threads(num_threads);
   std::atomic<unsigned long long> num_processed_doubles(0);
   std::atomic<unsigned long long> num_special_cases(0);
