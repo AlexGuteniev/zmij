@@ -83,22 +83,25 @@ auto is_pow10_exact_for_bin_exp(int bin_exp) -> bool {
 
 // Finds the smallest n > 0 such that (n * a) % b is in [lower, upper].
 // This is a standard algorithm for linear congruential inequalities.
-int find_min_n(uint64_t a, uint128_t b, uint64_t lower, uint64_t upper) {
-  if (lower > upper) return -1;
-  if (a == 0) return lower == 0 ? 1 : -1;
+auto find_min_n(uint64_t a, uint128_t b, uint64_t lower, uint64_t upper)
+    -> uint64_t {
+  constexpr uint64_t not_found = ~uint64_t();
+  if (lower > upper) return not_found;
+  a %= b;
+  if (a == 0) return lower == 0 ? 1 : not_found;
 
   if ((lower + a - 1) / a <= upper / a) return (lower + a - 1) / a;
 
-  int res = find_min_n(b % a, a, (a - upper % a) % a, (a - lower % a) % a);
-  if (res == -1) return -1;
-  return (res * b + lower + a - 1) / a;
+  uint64_t n = find_min_n(b % a, a, (a - upper % a) % a, (a - lower % a) % a);
+  if (n == not_found) return not_found;
+  return (n * b + lower + a - 1) / a;
 }
 
 // Finds all numbers greater or equal to 0xff100000'00000000 in [x0, x0 + count)
 // without enumerating the whole sequence.
 void fast_check(uint64_t x0, uint64_t d, uint64_t count) {
   uint64_t threshold = 0xff100000'00000000;
-  int current_n_offset = 0;
+  uint64_t current_n_offset = 0;
   uint128_t mod = uint128_t(1) << 64;
   for (uint64_t i = 0;; ++i) {
     // Adjust search range based on current x0.
@@ -107,31 +110,27 @@ void fast_check(uint64_t x0, uint64_t d, uint64_t count) {
 
     // If target_lower > target_R, the range wraps around the modulus.
     // We split it or handle it by checking the smallest n for either side.
-    int n = 0;
+    uint64_t n = 0;
     if (target_lower <= target_upper) {
       n = find_min_n(d, mod, target_lower, target_upper);
     } else {
       // Range is [target_lower, mod - 1] OR [0, target_upper].
-      int n1 = find_min_n(d, mod, target_lower, mod - 1);
-      int n2 = find_min_n(d, mod, 0, target_upper);
-      if (n1 != -1 && n2 != -1)
-        n = std::min(n1, n2);
-      else if (n1 == -1)
-        n = n2;
-      else
-        n = n1;
+      uint64_t n1 = find_min_n(d, mod, target_lower, mod - 1);
+      uint64_t n2 = find_min_n(d, mod, 0, target_upper);
+      n = n1 < n2 ? n1 : n2;
     }
 
-    int actual_n = current_n_offset + n;
-    uint64_t val = (x0 + n * d);
+    uint64_t actual_n = current_n_offset + n;
+    uint64_t val = x0 + n * d;
     if (actual_n >= count) {
-      printf("Fast check found %lld special cases in %d values\n", i, actual_n);
+      printf("Fast check found %lld special cases in %lld values\n", i,
+             actual_n);
       return;
     }
     // printf("%llx\n", (unsigned long long)val);
 
     // Advance the sequence to look for the next hit.
-    x0 = (val + d);
+    x0 = val + d;
     current_n_offset = actual_n + 1;
   }
 }
