@@ -231,6 +231,9 @@ template <typename Float> struct float_traits : std::numeric_limits<Float> {
     return bits;
   }
 
+  static auto is_negative(sig_type bits) noexcept -> bool {
+    return bits >> (num_bits - 1);
+  }
   static auto get_sig(sig_type bits) noexcept -> sig_type {
     return bits & (implicit_bit - 1);
   }
@@ -611,7 +614,7 @@ inline auto to_decimal(double value) noexcept -> dec_fp {
   bin_exp -= traits::num_sig_bits + traits::exp_bias;
   auto [dec_sig, dec_exp] = ::to_decimal(
       bin_sig, bin_exp, compute_dec_exp(bin_exp, true), regular, subnormal);
-  return {bits >> (traits::num_bits - 1) ? -dec_sig : dec_sig, dec_exp};
+  return {traits::is_negative(bits) ? -dec_sig : dec_sig, dec_exp};
 }
 
 namespace detail {
@@ -627,7 +630,7 @@ auto write(Float value, char* buffer) noexcept -> char* {
   auto dec_exp = compute_dec_exp(bin_exp, true);
 
   *buffer = '-';
-  buffer += bits >> (traits::num_bits - 1);
+  buffer += traits::is_negative(bits);
 
   auto bin_sig = traits::get_sig(bits);  // binary significand
   bool regular = bin_sig != 0;
