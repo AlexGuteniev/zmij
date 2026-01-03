@@ -100,7 +100,7 @@ auto main() -> int {
   }
   printf("Verifying binary exponent %d (0x%03x)\n", bin_exp, raw_exp);
 
-  constexpr uint64_t num_significands = uint64_t(1) << 34;  // test a subset
+  constexpr uint64_t num_significands = uint64_t(1) << 36;  // test a subset
 
   constexpr uint64_t exp_bits = uint64_t(raw_exp) << traits::num_sig_bits;
   constexpr int dec_exp = compute_dec_exp(bin_exp, true);
@@ -182,20 +182,21 @@ auto main() -> int {
           start = hit_val + scaled_step;
           ++total_n;
 
-          num_processed_doubles += total_n - first_unreported;
-          first_unreported = total_n;
-
           if (total_n >= count) {
             printf("Fast check found %d special cases in %lld values\n",
                    hits_found, total_n);
             break;
           }
 
-          if (i == 0 && (hits_found % 100'000) == 0) {
-            auto now = std::chrono::steady_clock::now();
-            if (now - last_update_time >= std::chrono::seconds(1)) {
-              last_update_time = now;
-              printf("Progress: %7.4f%%\n", num_processed_doubles * percent);
+          if ((hits_found % 100'000) == 0) {
+            num_processed_doubles += total_n - first_unreported;
+            first_unreported = total_n;
+            if (i == 0) {
+              auto now = std::chrono::steady_clock::now();
+              if (now - last_update_time >= std::chrono::seconds(1)) {
+                last_update_time = now;
+                printf("Progress: %7.4f%%\n", num_processed_doubles * percent);
+              }
             }
           }
         }
