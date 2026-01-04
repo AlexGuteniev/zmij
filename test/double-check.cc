@@ -104,8 +104,8 @@ auto main() -> int {
   for (int exp = 0; exp < traits::exp_mask; ++exp) {
     if (!is_pow10_exact_for_bin_exp(debias(exp))) ++num_inexact_exponents;
   }
-  printf("Verifying binary exponent %d (0x%03x); %d total\n",
-         bin_exp, raw_exp, num_inexact_exponents);
+  printf("Verifying binary exponent %d (0x%03x); %d total\n", bin_exp, raw_exp,
+         num_inexact_exponents);
 
   constexpr int dec_exp = compute_dec_exp(bin_exp, true);
   constexpr int exp_shift = compute_exp_shift(bin_exp, dec_exp);
@@ -118,7 +118,7 @@ auto main() -> int {
   unsigned num_threads = std::thread::hardware_concurrency();
   std::vector<std::thread> threads(num_threads);
   printf("Using %u threads\n", num_threads);
-  
+
   std::atomic<unsigned long long> num_processed_doubles(0);
   std::atomic<unsigned long long> num_special_cases(0);
   std::atomic<unsigned long long> num_errors(0);
@@ -140,7 +140,7 @@ auto main() -> int {
 
       constexpr uint64_t pow10_lo = pow10_significands[-dec_exp].lo;
       constexpr uint64_t exp_bits =
-        uint64_t(raw_exp) << traits::num_sig_bits ^ traits::implicit_bit;
+          uint64_t(raw_exp) << traits::num_sig_bits ^ traits::implicit_bit;
 
       // With great power of 10 comes great responsibility to check the
       // approximation error. The exact power of 10 significand is in the range
@@ -153,8 +153,7 @@ auto main() -> int {
       bool has_errors = false;
       uint64_t last_index = 0;
       num_special_cases += find_carried_away_doubles<pow10_lo, exp_shift>(
-          bin_sig_first, bin_sig_last,
-          [&](uint64_t index) {
+          bin_sig_first, bin_sig_last, [&](uint64_t index) {
             if ((index % (1 << 20)) == 0) {
               num_processed_doubles += index - last_index;
               last_index = index;
@@ -171,15 +170,18 @@ auto main() -> int {
   std::atomic<bool> done(false);
   std::thread progress([&]() {
     auto last_update_time = std::chrono::steady_clock::now();
-    while (!done) {
+    for (;;) {
       auto now = std::chrono::steady_clock::now();
-      if (now - last_update_time >= std::chrono::seconds(1)) {
+      if (now - last_update_time >= std::chrono::seconds(1) || done) {
         last_update_time = now;
-        printf("Progress: %7.4f%%\n",
-                num_processed_doubles * 100.0 / num_significands);
+        printf("\rProgress: %6.2f%%",
+               num_processed_doubles * 100.0 / num_significands);
+        fflush(stdout);
+        if (done) break;
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+    puts("");
   });
 
   for (int i = 0; i < num_threads; ++i) threads[i].join();
@@ -188,9 +190,10 @@ auto main() -> int {
   auto finish = std::chrono::steady_clock::now();
 
   using seconds = std::chrono::duration<double>;
-  printf("%llu errors and %llu special cases in %llu values in %.2f seconds\n",
-         num_errors.load(), num_special_cases.load(),
-         num_processed_doubles.load(),
-         std::chrono::duration_cast<seconds>(finish - start).count());
+  printf(
+      "Found %llu special cases and %llu errors among %llu values in %.2f "
+      "seconds\n",
+      num_special_cases.load(), num_errors.load(), num_processed_doubles.load(),
+      std::chrono::duration_cast<seconds>(finish - start).count());
   return num_errors != 0 ? 1 : 0;
 }
