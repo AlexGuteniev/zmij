@@ -566,7 +566,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int dec_exp,
         fractional != half_ulp &&
         // Boundary case when rounding down to nearest 10.
         scaled_sig_mod10 != scaled_half_ulp &&
-        // Near-boundary case for rounding up to nearest 10.
+        // Near-boundary case when rounding up to nearest 10.
         // Case where upper != ten is insufficient: 1.342178e+08f.
         ten - upper > 1u // upper != ten && upper != ten - 1
       ) [[ZMIJ_LIKELY]] {
