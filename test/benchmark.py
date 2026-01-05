@@ -39,11 +39,14 @@ def benchmark_commit(sha: str, workdir: Path, writer: csv.Writer):
         print(f"Skipping commit")
         return
 
-    run(["c++", "-O3", "-DNDEBUG", "-std=c++20", "-I", str(workdir), "-I", ".",
+    benchmark = str(workdir / "benchmark")
+    run(["c++", "-O3", "-DNDEBUG", "-std=c++20",
+         "-I", str(workdir), "-I", ".",
          "benchmark.cc", "zmij-benchmark.cc", str(workdir / "zmij.cc"),
-         "fmt/format.cc", "dragonbox/dragonbox_to_chars.cpp"])
+         "fmt/format.cc", "dragonbox/dragonbox_to_chars.cpp",
+         "-o", benchmark])
 
-    output = run(["./a.out"])
+    output = run([benchmark])
 
     for line in output.splitlines():
         if ":" not in line or "ns" not in line:
