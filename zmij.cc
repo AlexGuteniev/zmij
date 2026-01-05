@@ -80,7 +80,21 @@ struct dec_fp {
 #  define ZMIJ_INLINE inline
 #endif
 
+#ifdef __GNUC__
+#  define ZMIJ_ASM(x) asm x
+#else
+#  define ZMIJ_ASM(x)
+#endif
+
 namespace {
+
+#ifdef __cpp_lib_is_constant_evaluated
+using std::is_constant_evaluated;
+#  define ZMIJ_CONSTEXPR constexpr
+#else
+auto is_constant_evaluated() -> bool { return false; }
+#  define ZMIJ_CONSTEXPR
+#endif
 
 inline auto is_big_endian() noexcept -> bool {
   int n = 1;
@@ -254,11 +268,24 @@ template <typename Float> struct float_traits : std::numeric_limits<Float> {
 // 128-bit significands of powers of 10 rounded down.
 // Generated using 192-bit arithmetic method by Dougall Johnson.
 struct pow10_significands_table {
-  uint128 data[617];
+  static constexpr int num_pow10 = 617;
+  static constexpr bool split_tables = true;
 
-  constexpr auto operator[](int dec_exp) const noexcept -> const uint128& {
+  uint64_t data[num_pow10 * 2];
+
+  ZMIJ_CONSTEXPR auto operator[](int dec_exp) const noexcept -> uint128 {
     constexpr int dec_exp_min = -292;
-    return data[dec_exp - dec_exp_min];
+    if (!split_tables) {
+      int index = (dec_exp - dec_exp_min) * 2;
+      return {data[index], data[index + 1]};
+    }
+
+    const uint64_t* hi = data + num_pow10 + dec_exp_min - 1;
+    const uint64_t* lo = hi + num_pow10;
+
+    // Force indexed loads.
+    if (!is_constant_evaluated()) ZMIJ_ASM(volatile("" : "+r"(hi), "+r"(lo)));
+    return {hi[-dec_exp], lo[-dec_exp]};
   }
 
   constexpr pow10_significands_table() noexcept : data() {
@@ -271,8 +298,14 @@ struct pow10_significands_table {
     uint192 current = {0xe000000000000000, 0x25e8e89c13bb0f7a,
                        0xff77b1fcbebcdc4f};
     uint64_t ten = 0xa000000000000000;
-    for (auto& datum : data) {
-      datum = {current.w2, current.w1};
+    for (int i = 0; i < num_pow10; ++i) {
+      if (split_tables) {
+        data[num_pow10 - i - 1] = current.w2;
+        data[num_pow10 * 2 - i - 1] = current.w1;
+      } else {
+        data[i * 2] = current.w2;
+        data[i * 2 + 1] = current.w1;
+      }
 
       uint64_t h0 = umul128_upper64(current.w0, ten);
       uint64_t h1 = umul128_upper64(current.w1, ten);
@@ -579,8 +612,8 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int dec_exp,
         scaled_sig_mod10 != scaled_half_ulp &&
         // Near-boundary case when rounding up to nearest 10.
         // Case where upper != ten is insufficient: 1.342178e+08f.
-        ten - upper > 1u // upper != ten && upper != ten - 1
-      ) [[ZMIJ_LIKELY]] {
+        ten - upper > 1u  // upper != ten && upper != ten - 1
+        ) [[ZMIJ_LIKELY]] {
       bool round_up = upper >= ten;
       int64_t shorter = int64_t(integral - digit + round_up * 10);
       int64_t longer = int64_t(integral + (fractional >= half_ulp));
