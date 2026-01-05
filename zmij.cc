@@ -536,7 +536,8 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int dec_exp,
                             bool regular, bool subnormal) noexcept
     -> zmij::dec_fp {
   constexpr int num_bits = std::numeric_limits<UInt>::digits;
-  if (regular & !subnormal) [[ZMIJ_LIKELY]] {
+  // An optimization from yy by Yaoyuan Guo:
+  while (regular & !subnormal) {
     int exp_shift = compute_exp_shift(bin_exp, dec_exp);
     auto [pow10_hi, pow10_lo] = pow10_significands[-dec_exp];
 
@@ -551,6 +552,11 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int dec_exp,
       integral = uint64_t(result >> 64);
       fractional = uint64_t(result);
     }
+    constexpr uint64_t half_ulp = uint64_t(1) << 63;
+
+    // Exact half-ulp tie when rounding to nearest integer.
+    if (fractional == half_ulp) [[ZMIJ_UNLIKELY]] break;
+
 #if ZMIJ_USE_INT128
     // An optimization of integral % 10 by Dougall Johnson.
     // Relies on range calculation: (max_bin_sig << max_exp_shift) * max_u128.
@@ -576,7 +582,6 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int dec_exp,
     // by 10**dec_exp. Add 1 to combine the shift with division by two.
     uint64_t scaled_half_ulp = pow10_hi >> (num_integral_bits - exp_shift + 1);
     uint64_t upper = scaled_sig_mod10 + scaled_half_ulp;
-    constexpr uint64_t half_ulp = uint64_t(1) << 63;
 
     // value = 5.0507837461e-27
     // next  = 5.0507837461000010e-27
@@ -597,11 +602,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int dec_exp,
     // s - shorter underestimate, S - shorter overestimate
     // l - longer underestimate,  L - longer overestimate
 
-    // An optimization from yy by Yaoyuan Guo:
-    if (
-        // Exact half-ulp tie when rounding to nearest integer.
-        fractional != half_ulp &&
-        // Boundary case when rounding down to nearest 10.
+    if (// Boundary case when rounding down to nearest 10.
         scaled_sig_mod10 != scaled_half_ulp &&
         // Near-boundary case when rounding up to nearest 10.
         // Case where upper != ten is insufficient: 1.342178e+08f.
@@ -613,6 +614,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int dec_exp,
       bool use_shorter = (scaled_sig_mod10 <= scaled_half_ulp) + round_up != 0;
       return {use_shorter ? shorter : longer, dec_exp};
     }
+    break;
   }
 
   dec_exp = compute_dec_exp(bin_exp, regular);
