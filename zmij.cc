@@ -666,16 +666,15 @@ namespace zmij {
 inline auto to_decimal(double value) noexcept -> dec_fp {
   using traits = float_traits<double>;
   auto bits = traits::to_bits(value);
-  auto bin_sig = traits::get_sig(bits);  // binary significand
   auto bin_exp = traits::get_exp(bits);  // binary exponent
-  bool regular = bin_sig != 0;
+  auto bin_sig = traits::get_sig(bits);  // binary significand
   bool special = ((bin_exp + 1) & traits::exp_mask) <= 1;
+  bool regular = (bin_sig != 0) | special;
   if (special) [[ZMIJ_UNLIKELY]] {
     if (bin_exp != 0) return {0, int(~0u >> 1)};
     if (bin_sig == 0) return {0, 0};
     bin_sig |= traits::implicit_bit;
     bin_exp = 1;
-    regular = true;
   }
   bin_sig ^= traits::implicit_bit;
   bin_exp -= traits::num_sig_bits + traits::exp_bias;
@@ -697,8 +696,8 @@ auto write(Float value, char* buffer) noexcept -> char* {
   buffer += traits::is_negative(bits);
 
   auto bin_sig = traits::get_sig(bits);  // binary significand
-  bool regular = bin_sig != 0;
   bool special = ((bin_exp + 1) & traits::exp_mask) <= 1;
+  bool regular = (bin_sig != 0) | special;  // | special slightly improves perf.
   if (special) [[ZMIJ_UNLIKELY]] {
     if (bin_exp != 0) {
       memcpy(buffer, bin_sig == 0 ? "inf" : "nan", 4);
@@ -708,10 +707,8 @@ auto write(Float value, char* buffer) noexcept -> char* {
       memcpy(buffer, "0", 2);
       return buffer + 1;
     }
-    bin_exp = 1;
     bin_sig |= traits::implicit_bit;
-    // Setting regular is not redundant: it has a measurable perf impact.
-    regular = true;
+    bin_exp = 1;
   }
   bin_sig ^= traits::implicit_bit;
   bin_exp -= traits::num_sig_bits + traits::exp_bias;
