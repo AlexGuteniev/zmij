@@ -338,7 +338,8 @@ constexpr auto compute_dec_exp(int bin_exp, bool regular) noexcept -> int {
 }
 
 constexpr ZMIJ_INLINE auto do_compute_exp_shift(int bin_exp,
-                                                int dec_exp) noexcept -> int {
+                                                int dec_exp) noexcept
+    -> unsigned char {
   assert(dec_exp >= -350 && dec_exp <= 350);
   // log2_pow10_sig = round(log2(10) * 2**log2_pow10_exp) + 1
   constexpr int log2_pow10_sig = 217'707, log2_pow10_exp = 16;
@@ -379,7 +380,8 @@ constexpr exp_shift_table exp_shifts;
 //   3 * 2**60 / 100 = 3.45...e+16  (needs shift = 2 + 1)
 template <int num_bits>
 constexpr ZMIJ_INLINE auto compute_exp_shift(int bin_exp, int dec_exp,
-                                             bool regular) noexcept -> int {
+                                             bool regular) noexcept
+    -> unsigned char {
   if (num_bits == 64 && exp_shift_table::enable && regular)
     return exp_shifts.data[bin_exp + exp_shift_table::offset];
   return do_compute_exp_shift(bin_exp, dec_exp);
@@ -566,7 +568,8 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int raw_exp,
   // An optimization from yy by Yaoyuan Guo:
   while (regular & !subnormal) {
     int dec_exp = compute_dec_exp(bin_exp, true);
-    int exp_shift = compute_exp_shift<num_bits>(bin_exp, dec_exp, true);
+    unsigned char exp_shift =
+        compute_exp_shift<num_bits>(bin_exp, dec_exp, true);
     uint128 pow10 = pow10_significands[-dec_exp];
 
     UInt integral = 0;        // integral part of bin_sig * pow10
@@ -647,7 +650,8 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int raw_exp,
   }
 
   int dec_exp = compute_dec_exp(bin_exp, regular);
-  int exp_shift = compute_exp_shift<num_bits>(bin_exp, dec_exp, regular);
+  unsigned char exp_shift =
+      compute_exp_shift<num_bits>(bin_exp, dec_exp, regular);
   uint128 pow10 = pow10_significands[-dec_exp];
 
   // Fallback to Schubfach to guarantee correctness in boundary cases.
