@@ -532,12 +532,12 @@ auto normalize(zmij::dec_fp dec, bool subnormal) noexcept -> zmij::dec_fp {
 // Converts a binary FP number bin_sig * 2**bin_exp to the shortest decimal
 // representation.
 template <typename UInt>
-ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int dec_exp,
-                            bool regular, bool subnormal) noexcept
-    -> zmij::dec_fp {
+ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
+                            bool subnormal) noexcept -> zmij::dec_fp {
   constexpr int num_bits = std::numeric_limits<UInt>::digits;
   // An optimization from yy by Yaoyuan Guo:
   while (regular & !subnormal) {
+    int dec_exp = compute_dec_exp(bin_exp, true);
     int exp_shift = compute_exp_shift(bin_exp, dec_exp);
     uint128 pow10 = pow10_significands[-dec_exp];
 
@@ -618,7 +618,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int dec_exp,
     break;
   }
 
-  dec_exp = compute_dec_exp(bin_exp, regular);
+  int dec_exp = compute_dec_exp(bin_exp, regular);
   int exp_shift = compute_exp_shift(bin_exp, dec_exp);
   uint128 pow10 = pow10_significands[-dec_exp];
 
@@ -679,8 +679,7 @@ inline auto to_decimal(double value) noexcept -> dec_fp {
   }
   bin_sig ^= traits::implicit_bit;
   bin_exp -= traits::num_sig_bits + traits::exp_bias;
-  auto dec = ::to_decimal(bin_sig, bin_exp, compute_dec_exp(bin_exp, true),
-                          regular, special);
+  auto dec = ::to_decimal(bin_sig, bin_exp, regular, special);
   return {traits::is_negative(bits) ? -dec.sig : dec.sig, dec.exp};
 }
 
@@ -693,8 +692,6 @@ auto write(Float value, char* buffer) noexcept -> char* {
   auto bits = traits::to_bits(value);
   auto raw_exp = traits::get_exp(bits);  // binary exponent
   auto bin_exp = raw_exp - traits::num_sig_bits - traits::exp_bias;
-  // Compute the decimal exponent early to overlap its latency with other work.
-  auto dec_exp = compute_dec_exp(bin_exp, true);
 
   *buffer = '-';
   buffer += traits::is_negative(bits);
@@ -719,8 +716,8 @@ auto write(Float value, char* buffer) noexcept -> char* {
   bin_sig ^= traits::implicit_bit;
 
   // Here be 🐉s.
-  auto dec = ::to_decimal(bin_sig, bin_exp, dec_exp, regular, special);
-  dec_exp = dec.exp;
+  auto dec = ::to_decimal(bin_sig, bin_exp, regular, special);
+  int dec_exp = dec.exp;
 
   // Write significand.
   char* start = buffer;
