@@ -44,9 +44,9 @@ constexpr auto debias(int bin_exp_biased) -> int {
   return bin_exp_biased - (traits::num_sig_bits + traits::exp_bias);
 }
 
-inline auto verify(uint64_t bits, uint64_t bin_sig, int bin_exp,
+inline auto verify(uint64_t bits, uint64_t bin_sig, int bin_exp, int raw_exp,
                    bool& has_errors) -> bool {
-  zmij::dec_fp actual = to_decimal(bin_sig, bin_exp, true, false);
+  zmij::dec_fp actual = to_decimal(bin_sig, bin_exp, raw_exp, true, false);
 
   double value;
   memcpy(&value, &bits, sizeof(double));
@@ -96,7 +96,7 @@ template <int raw_exp>
 void run(uint64_t bin_sig_first, uint64_t bin_sig_last, stats& s) {
   constexpr int bin_exp = debias(raw_exp);
   constexpr int dec_exp = compute_dec_exp(bin_exp, true);
-  constexpr int exp_shift = compute_exp_shift(bin_exp, dec_exp);
+  constexpr int exp_shift = compute_exp_shift<64>(bin_exp, dec_exp, true);
   constexpr uint64_t pow10_lo = pow10_significands[-dec_exp].lo;
   constexpr uint64_t exp_bits =
       uint64_t(raw_exp) << traits::num_sig_bits ^ traits::implicit_bit;
@@ -119,7 +119,7 @@ void run(uint64_t bin_sig_first, uint64_t bin_sig_last, stats& s) {
         }
         uint64_t bin_sig = bin_sig_first + index;
         uint64_t bits = exp_bits ^ bin_sig;
-        if (!verify(bits, bin_sig, bin_exp, has_errors)) ++s.num_errors;
+        if (!verify(bits, bin_sig, bin_exp, raw_exp, has_errors)) ++s.num_errors;
       });
   s.num_processed_doubles += bin_sig_last - bin_sig_first - last_index + 1;
 }
@@ -173,7 +173,7 @@ auto main(int argc, char** argv) -> int {
          num_inexact_exponents);
 
   int dec_exp = compute_dec_exp(bin_exp, true);
-  int exp_shift = compute_exp_shift(bin_exp, dec_exp);
+  int exp_shift = compute_exp_shift<64>(bin_exp, dec_exp, true);
   printf("dec_exp=%d exp_shift=%d\n", dec_exp, exp_shift);
   if (is_pow10_exact_for_bin_exp(bin_exp)) {
     printf("Power of 10 is exact for bin_exp=%d\n", bin_exp);

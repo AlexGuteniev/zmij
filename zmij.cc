@@ -271,7 +271,7 @@ struct pow10_significands_table {
   static constexpr int num_pow10 = 617;
   static constexpr bool split_tables = true;
 
-  uint64_t data[num_pow10 * 2];
+  uint64_t data[num_pow10 * 2] = {};
 
   ZMIJ_CONSTEXPR auto operator[](int dec_exp) const noexcept -> uint128 {
     constexpr int dec_exp_min = -292;
@@ -288,7 +288,7 @@ struct pow10_significands_table {
     return {hi[-dec_exp], lo[-dec_exp]};
   }
 
-  constexpr pow10_significands_table() noexcept : data() {
+  constexpr pow10_significands_table() noexcept {
     struct uint192 {
       uint64_t w0, w1, w2;  // w0 = least significant, w2 = most significant
     };
@@ -324,6 +324,66 @@ struct pow10_significands_table {
   }
 };
 constexpr pow10_significands_table pow10_significands;
+
+// Computes the decimal exponent as floor(log10(2**bin_exp)) if regular or
+// floor(log10(3/4 * 2**bin_exp)) otherwise, without branching.
+constexpr auto compute_dec_exp(int bin_exp, bool regular) noexcept -> int {
+  assert(bin_exp >= -1334 && bin_exp <= 2620);
+  // log10_3_over_4_sig = -log10(3/4) * 2**log10_2_exp rounded to a power of 2
+  constexpr int log10_3_over_4_sig = 131'072;
+  // log10_2_sig = round(log10(2) * 2**log10_2_exp)
+  constexpr int log10_2_sig = 315'653;
+  constexpr int log10_2_exp = 20;
+  return (bin_exp * log10_2_sig - !regular * log10_3_over_4_sig) >> log10_2_exp;
+}
+
+constexpr ZMIJ_INLINE auto do_compute_exp_shift(int bin_exp,
+                                                int dec_exp) noexcept -> int {
+  assert(dec_exp >= -350 && dec_exp <= 350);
+  // log2_pow10_sig = round(log2(10) * 2**log2_pow10_exp) + 1
+  constexpr int log2_pow10_sig = 217'707, log2_pow10_exp = 16;
+  // pow10_bin_exp = floor(log2(10**-dec_exp))
+  int pow10_bin_exp = -dec_exp * log2_pow10_sig >> log2_pow10_exp;
+  // pow10 = ((pow10_hi << 64) | pow10_lo) * 2**(pow10_bin_exp - 127)
+  return bin_exp + pow10_bin_exp + 1;
+}
+
+struct exp_shift_table {
+  using traits = float_traits<double>;
+  static constexpr bool enable = true;
+  static constexpr int num_exps = traits::exp_mask + 1;
+  static constexpr int offset = traits::num_sig_bits + traits::exp_bias;
+  unsigned char data[enable ? num_exps : 1] = {};
+
+  constexpr exp_shift_table() {
+    if (!enable) return;
+    for (int raw_exp = 0; raw_exp < num_exps; ++raw_exp) {
+      int bin_exp = raw_exp - offset;
+      if (raw_exp == 0) ++bin_exp;
+      int dec_exp = compute_dec_exp(bin_exp, true);
+      data[raw_exp] = do_compute_exp_shift(bin_exp, dec_exp);
+    }
+  }
+};
+constexpr exp_shift_table exp_shifts;
+
+// Computes a shift so that, after scaling by a power of 10, the intermediate
+// result always has a fixed 128-bit fractional part (for double).
+//
+// Different binary exponents can map to the same decimal exponent, but place
+// the decimal point at different bit positions. The shift compensates for this.
+//
+// For example, both 3 * 2**59 and 3 * 2**60 have dec_exp = 2, but dividing by
+// 10^dec_exp puts the decimal point in different bit positions:
+//   3 * 2**59 / 100 = 1.72...e+16  (needs shift = 1 + 1)
+//   3 * 2**60 / 100 = 3.45...e+16  (needs shift = 2 + 1)
+template <int num_bits>
+constexpr ZMIJ_INLINE auto compute_exp_shift(int bin_exp, int dec_exp,
+                                             bool regular) noexcept -> int {
+  if (num_bits == 64 && exp_shift_table::enable && regular)
+    return exp_shifts.data[bin_exp + exp_shift_table::offset];
+  return do_compute_exp_shift(bin_exp, dec_exp);
+}
 
 inline auto count_trailing_nonzeros(uint64_t x) noexcept -> int {
   // We count the number of bytes until there are only zeros left.
@@ -485,39 +545,6 @@ auto write_significand9(char* buffer, uint32_t value) noexcept -> char* {
   return buffer - int(buffer - start == 1);
 }
 
-// Computes the decimal exponent as floor(log10(2**bin_exp)) if regular or
-// floor(log10(3/4 * 2**bin_exp)) otherwise, without branching.
-constexpr auto compute_dec_exp(int bin_exp, bool regular) noexcept -> int {
-  assert(bin_exp >= -1334 && bin_exp <= 2620);
-  // log10_3_over_4_sig = -log10(3/4) * 2**log10_2_exp rounded to a power of 2
-  constexpr int log10_3_over_4_sig = 131'072;
-  // log10_2_sig = round(log10(2) * 2**log10_2_exp)
-  constexpr int log10_2_sig = 315'653;
-  constexpr int log10_2_exp = 20;
-  return (bin_exp * log10_2_sig - !regular * log10_3_over_4_sig) >> log10_2_exp;
-}
-
-// Computes a shift so that, after scaling by a power of 10, the intermediate
-// result always has a fixed 128-bit fractional part (for double).
-//
-// Different binary exponents can map to the same decimal exponent, but place
-// the decimal point at different bit positions. The shift compensates for this.
-//
-// For example, both 3 * 2**59 and 3 * 2**60 have dec_exp = 2, but dividing by
-// 10^dec_exp puts the decimal point in different bit positions:
-//   3 * 2**59 / 100 = 1.72...e+16  (needs shift = 1 + 1)
-//   3 * 2**60 / 100 = 3.45...e+16  (needs shift = 2 + 1)
-constexpr ZMIJ_INLINE auto compute_exp_shift(int bin_exp, int dec_exp) noexcept
-    -> int {
-  assert(dec_exp >= -350 && dec_exp <= 350);
-  // log2_pow10_sig = round(log2(10) * 2**log2_pow10_exp) + 1
-  constexpr int log2_pow10_sig = 217'707, log2_pow10_exp = 16;
-  // pow10_bin_exp = floor(log2(10**-dec_exp))
-  int pow10_bin_exp = -dec_exp * log2_pow10_sig >> log2_pow10_exp;
-  // pow10 = ((pow10_hi << 64) | pow10_lo) * 2**(pow10_bin_exp - 127)
-  return bin_exp + pow10_bin_exp + 1;
-}
-
 template <int num_bits>
 auto normalize(zmij::dec_fp dec, bool subnormal) noexcept -> zmij::dec_fp {
   if (!subnormal) [[ZMIJ_LIKELY]]
@@ -532,13 +559,14 @@ auto normalize(zmij::dec_fp dec, bool subnormal) noexcept -> zmij::dec_fp {
 // Converts a binary FP number bin_sig * 2**bin_exp to the shortest decimal
 // representation.
 template <typename UInt>
-ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
-                            bool subnormal) noexcept -> zmij::dec_fp {
+ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int raw_exp,
+                            bool regular, bool subnormal) noexcept
+    -> zmij::dec_fp {
   constexpr int num_bits = std::numeric_limits<UInt>::digits;
   // An optimization from yy by Yaoyuan Guo:
   while (regular & !subnormal) {
     int dec_exp = compute_dec_exp(bin_exp, true);
-    int exp_shift = compute_exp_shift(bin_exp, dec_exp);
+    int exp_shift = compute_exp_shift<num_bits>(bin_exp, dec_exp, true);
     uint128 pow10 = pow10_significands[-dec_exp];
 
     UInt integral = 0;        // integral part of bin_sig * pow10
@@ -619,7 +647,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, bool regular,
   }
 
   int dec_exp = compute_dec_exp(bin_exp, regular);
-  int exp_shift = compute_exp_shift(bin_exp, dec_exp);
+  int exp_shift = compute_exp_shift<num_bits>(bin_exp, dec_exp, regular);
   uint128 pow10 = pow10_significands[-dec_exp];
 
   // Fallback to Schubfach to guarantee correctness in boundary cases.
@@ -678,7 +706,8 @@ inline auto to_decimal(double value) noexcept -> dec_fp {
   }
   bin_sig ^= traits::implicit_bit;
   bin_exp -= traits::num_sig_bits + traits::exp_bias;
-  auto dec = ::to_decimal(bin_sig, bin_exp, regular, special);
+  auto dec =
+      ::to_decimal(bin_sig, bin_exp, traits::get_exp(bits), regular, special);
   return {traits::is_negative(bits) ? -dec.sig : dec.sig, dec.exp};
 }
 
@@ -690,12 +719,13 @@ auto write(Float value, char* buffer) noexcept -> char* {
   using traits = float_traits<Float>;
   auto bits = traits::to_bits(value);
   // It is beneficial to compute exponent early.
-  auto bin_exp = traits::get_exp(bits);  // binary exponent
+  auto raw_exp = traits::get_exp(bits);
 
   *buffer = '-';
   buffer += traits::is_negative(bits);
 
   auto bin_sig = traits::get_sig(bits);  // binary significand
+  auto bin_exp = raw_exp;                // binary exponent
   bool special = ((bin_exp + 1) & traits::exp_mask) <= 1;
   bool regular = (bin_sig != 0) | special;  // | special slightly improves perf.
   if (special) [[ZMIJ_UNLIKELY]] {
@@ -714,7 +744,7 @@ auto write(Float value, char* buffer) noexcept -> char* {
   bin_exp -= traits::num_sig_bits + traits::exp_bias;
 
   // Here be 🐉s.
-  auto dec = ::to_decimal(bin_sig, bin_exp, regular, special);
+  auto dec = ::to_decimal(bin_sig, bin_exp, raw_exp, regular, special);
   int dec_exp = dec.exp;
 
   // Write significand.
