@@ -3,7 +3,6 @@
 // Distributed under the MIT license (see LICENSE).
 
 #include <stdint.h>  // uint32_t
-#include <stdio.h>   // printf
 #include <string.h>  // memcpy
 
 #include <atomic>
@@ -13,6 +12,7 @@
 #include "../zmij.cc"
 #include "dragonbox/dragonbox.h"
 #include "modular-search.h"
+#include "print.h"
 
 namespace {
 
@@ -69,12 +69,10 @@ inline auto verify(uint64_t bits, uint64_t bin_sig, int bin_exp, int raw_exp,
 
   if (has_errors) return false;
   has_errors = true;
-  using ullong = unsigned long long;
-  printf(
-      "Output mismatch for %.17g (%llu * 2**%d): %llu * 10**%d != %llu * "
-      "10**%d\n",
-      value, bin_sig, bin_exp, ullong(actual.sig), actual.exp,
-      ullong(expected.significand), expected.exponent);
+  print(
+      "Output mismatch for {} ({} * 2**{}): {} * 10**{} != {} * 10**{}\n",
+      value, bin_sig, bin_exp, actual.sig, actual.exp,
+      expected.significand, expected.exponent);
   return false;
 }
 
@@ -87,9 +85,9 @@ auto is_pow10_exact_for_bin_exp(int bin_exp) -> bool {
 }
 
 struct stats {
-  std::atomic<unsigned long long> num_processed_doubles = 0;
-  std::atomic<unsigned long long> num_special_cases = 0;
-  std::atomic<unsigned long long> num_errors = 0;
+  std::atomic<uint64_t> num_processed_doubles = 0;
+  std::atomic<uint64_t> num_special_cases = 0;
+  std::atomic<uint64_t> num_errors = 0;
 };
 
 template <int raw_exp>
@@ -129,7 +127,7 @@ void dispatch(int thread_index, int raw_exp, uint64_t bin_sig_first,
               uint64_t bin_sig_last, stats& s) {
   if constexpr (n == 100) {
     if (thread_index == 0) {
-      fprintf(stderr, "Unsupported exponent %d\n", raw_exp);
+      print(stderr, "Unsupported exponent {}\n", raw_exp);
       exit(1);
     }
   } else {
@@ -142,7 +140,7 @@ void dispatch(int thread_index, int raw_exp, uint64_t bin_sig_first,
 
 auto main(int argc, char** argv) -> int {
   if (argc != 2) {
-    fprintf(stderr, "Usage: %s <raw_exp>\n", argv[0]);
+    print(stderr, "Usage: {} <raw_exp>\n", argv[0]);
     return 1;
   }
 
@@ -162,27 +160,27 @@ auto main(int argc, char** argv) -> int {
 
   int bin_exp = debias(raw_exp);
   if (raw_exp == 0 || raw_exp == traits::exp_mask) {
-    fprintf(stderr, "Unsupported exponent\n");
+    print(stderr, "Unsupported exponent\n");
     return 1;
   }
   int num_inexact_exponents = 0;
   for (int exp = 0; exp < traits::exp_mask; ++exp) {
     if (!is_pow10_exact_for_bin_exp(debias(exp))) ++num_inexact_exponents;
   }
-  printf("Verifying binary exponent %d (0x%03x); %d total\n", bin_exp, raw_exp,
+  print("Verifying binary exponent {} (0x{:03x}); {} total\n", bin_exp, raw_exp,
          num_inexact_exponents);
 
   int dec_exp = compute_dec_exp(bin_exp, true);
   int exp_shift = compute_exp_shift<64, true>(bin_exp, dec_exp);
-  printf("dec_exp=%d exp_shift=%d\n", dec_exp, exp_shift);
+  print("dec_exp={} exp_shift={}\n", dec_exp, exp_shift);
   if (is_pow10_exact_for_bin_exp(bin_exp)) {
-    printf("Power of 10 is exact for bin_exp=%d\n", bin_exp);
+    print("Power of 10 is exact for bin_exp={}\n", bin_exp);
     return 0;
   }
 
   unsigned num_threads = std::thread::hardware_concurrency();
   std::vector<std::thread> threads(num_threads);
-  printf("Using %u threads\n", num_threads);
+  print("Using {} threads\n", num_threads);
 
   stats s;
   auto start = std::chrono::steady_clock::now();
@@ -196,7 +194,7 @@ auto main(int argc, char** argv) -> int {
     bin_sig_last |= traits::implicit_bit;
 
     threads[i] = std::thread([i, raw_exp, bin_sig_first, bin_sig_last, &s] {
-      printf("Thread %3d processing 0x%016llx - 0x%016llx\n", i, bin_sig_first,
+      print("Thread {:3} processing 0x{:016x} - 0x{:016x}\n", i, bin_sig_first,
              bin_sig_last);
       dispatch<1>(i, raw_exp, bin_sig_first, bin_sig_last, s);
     });
@@ -209,14 +207,14 @@ auto main(int argc, char** argv) -> int {
       auto now = std::chrono::steady_clock::now();
       if (now - last_update_time >= std::chrono::seconds(1) || done) {
         last_update_time = now;
-        printf("\rProgress: %6.2f%%",
+        print("\rProgress: {:6.2f}%",
                s.num_processed_doubles * 100.0 / num_significands);
         fflush(stdout);
         if (done) break;
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    puts("");
+    print("\n");
   });
 
   for (int i = 0; i < num_threads; ++i) threads[i].join();
@@ -225,8 +223,8 @@ auto main(int argc, char** argv) -> int {
   auto finish = std::chrono::steady_clock::now();
 
   using seconds = std::chrono::duration<double>;
-  printf(
-      "Found %llu special cases and %llu errors among %llu values in %.2f "
+  print(
+      "Found {} special cases and {} errors among {} values in {:.2f} "
       "seconds\n",
       s.num_special_cases.load(), s.num_errors.load(),
       s.num_processed_doubles.load(),

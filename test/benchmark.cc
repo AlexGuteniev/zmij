@@ -6,18 +6,13 @@
 
 #include <math.h>    // isnan
 #include <stdint.h>  // uint64_t
-#include <stdio.h>   // puts
 #include <stdlib.h>  // exit
 
 #include <algorithm>  // std::sort
 #include <charconv>   // std::from_chars
 #include <chrono>     // std::chrono::steady_clock::now
-#include <format>     // std::format
 
-template <typename... T>
-void print(std::format_string<T...> fmt, T&&... args) {
-  fputs(std::format(fmt, std::forward<T>(args)...).c_str(), stdout);
-}
+#include "print.h"
 
 constexpr int num_trials = 15;
 constexpr int max_digits = std::numeric_limits<double>::max_digits10;

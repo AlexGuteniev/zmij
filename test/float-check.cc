@@ -4,7 +4,6 @@
 // Distributed under the MIT license (see LICENSE).
 
 #include <stdint.h>  // uint32_t
-#include <stdio.h>   // printf
 #include <string.h>  // memcpy
 
 #include <atomic>
@@ -13,6 +12,7 @@
 #include <vector>
 
 #include "dragonbox/dragonbox_to_chars.h"
+#include "print.h"
 #include "zmij.h"
 
 auto main() -> int {
@@ -20,7 +20,7 @@ auto main() -> int {
   std::vector<std::thread> threads(num_threads);
   std::atomic<unsigned long long> num_processed_floats(0);
   std::atomic<unsigned long long> num_errors(0);
-  printf("Using %u threads\n", num_threads);
+  print("Using {} threads\n", num_threads);
 
   auto start = std::chrono::steady_clock::now();
   for (uint32_t i = 0; i < num_threads; ++i) {
@@ -43,7 +43,7 @@ auto main() -> int {
           auto now = std::chrono::steady_clock::now();
           if (i == 0 && now - last_update_time >= std::chrono::seconds(1)) {
             last_update_time = now;
-            printf("Progress: %5.2f%%\n", num_processed_floats * percent);
+            print("Progress: {:5.2f}%\n", num_processed_floats * percent);
           }
         }
 
@@ -62,7 +62,7 @@ auto main() -> int {
 
         ++num_errors;
         if (!has_errors) {
-          printf("Output mismatch: %s != %s\n", actual, expected);
+          print("Output mismatch: {} != {}\n", actual, expected);
           has_errors = true;
         }
       }
@@ -72,7 +72,7 @@ auto main() -> int {
   auto finish = std::chrono::steady_clock::now();
 
   using seconds = std::chrono::duration<double>;
-  printf("Tested %llu values in %.2f seconds\n", num_processed_floats.load(),
+  print("Tested {} values in {:.2f} seconds\n", num_processed_floats.load(),
          std::chrono::duration_cast<seconds>(finish - start).count());
   return num_errors != 0 ? 1 : 0;
 }
