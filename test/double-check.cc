@@ -195,7 +195,7 @@ auto main(int argc, char** argv) -> int {
     bin_sig_last |= traits::implicit_bit;
 
     fmt::print("Thread {:3} processing 0x{:016x} - 0x{:016x}\n", i,
-                bin_sig_first, bin_sig_last);
+               bin_sig_first, bin_sig_last);
     threads[i] = std::thread([i, raw_exp, bin_sig_first, bin_sig_last, &s] {
       dispatch<1>(i, raw_exp, bin_sig_first, bin_sig_last, s);
     });
@@ -208,8 +208,19 @@ auto main(int argc, char** argv) -> int {
       auto now = std::chrono::steady_clock::now();
       if (now - last_update_time >= std::chrono::seconds(1) || done) {
         last_update_time = now;
-        fmt::print("\rProgress: {:6.2f}%",
-                   s.num_processed_doubles * 100.0 / num_significands);
+
+        double elapsed_s = std::chrono::duration<double>(now - start).count();
+
+        double eta_s = 0;
+        double rate = s.num_processed_doubles / elapsed_s;  // items / s
+        double remaining = double(num_significands - s.num_processed_doubles);
+
+        auto eta = std::chrono::seconds(int(remaining / rate + 0.5));
+
+        fmt::print("\rProgress: {:6.2f}%  ETA: {:02d} hour(s) {:02d} minute(s)",
+                   s.num_processed_doubles * 100.0 / num_significands,
+                   int(eta.count() / 3600), int((eta.count() / 60) % 60));
+
         fflush(stdout);
         if (done) break;
       }
