@@ -43,7 +43,8 @@ auto main() -> int {
           auto now = std::chrono::steady_clock::now();
           if (i == 0 && now - last_update_time >= std::chrono::seconds(1)) {
             last_update_time = now;
-            print("Progress: {:5.2f}%\n", num_processed_floats * percent);
+            print("\rProgress: {:5.2f}%", num_processed_floats * percent);
+            fflush(stdout);
           }
         }
 
@@ -62,7 +63,7 @@ auto main() -> int {
 
         ++num_errors;
         if (!has_errors) {
-          print("Output mismatch: {} != {}\n", actual, expected);
+          print("\nOutput mismatch: {} != {}\n", actual, expected);
           has_errors = true;
         }
       }
@@ -72,7 +73,7 @@ auto main() -> int {
   auto finish = std::chrono::steady_clock::now();
 
   using seconds = std::chrono::duration<double>;
-  print("Tested {} values in {:.2f} seconds\n", num_processed_floats.load(),
+  print("\nTested {} values in {:.2f} seconds\n", num_processed_floats.load(),
         std::chrono::duration_cast<seconds>(finish - start).count());
   return num_errors != 0 ? 1 : 0;
 }
