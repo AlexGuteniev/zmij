@@ -559,10 +559,11 @@ auto normalize(zmij::dec_fp dec, bool subnormal) noexcept -> zmij::dec_fp {
 
 // Converts a binary FP number bin_sig * 2**bin_exp to the shortest decimal
 // representation.
-template <typename UInt>
-ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int raw_exp,
-                            bool regular, bool subnormal) noexcept
-    -> zmij::dec_fp {
+template <typename Float, typename UInt>
+ZMIJ_INLINE auto to_decimal(UInt bin_sig, int raw_exp, bool regular,
+                            bool subnormal) noexcept -> zmij::dec_fp {
+  using traits = float_traits<Float>;
+  int bin_exp = raw_exp - traits::num_sig_bits - traits::exp_bias;
   constexpr int num_bits = std::numeric_limits<UInt>::digits;
   // An optimization from yy by Yaoyuan Guo:
   while (regular & !subnormal) {
@@ -647,6 +648,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int bin_exp, int raw_exp,
     }
     break;
   }
+  bin_exp += subnormal;
 
   int dec_exp = compute_dec_exp(bin_exp, regular);
   unsigned char exp_shift = compute_exp_shift<num_bits>(bin_exp, dec_exp);
@@ -704,12 +706,9 @@ inline auto to_decimal(double value) noexcept -> dec_fp {
     if (bin_exp != 0) return {0, int(~0u >> 1)};
     if (bin_sig == 0) return {0, 0};
     bin_sig |= traits::implicit_bit;
-    bin_exp = 1;
   }
   bin_sig ^= traits::implicit_bit;
-  bin_exp -= traits::num_sig_bits + traits::exp_bias;
-  auto dec =
-      ::to_decimal(bin_sig, bin_exp, traits::get_exp(bits), regular, special);
+  auto dec = ::to_decimal<double>(bin_sig, bin_exp, regular, special);
   return {traits::is_negative(bits) ? -dec.sig : dec.sig, dec.exp};
 }
 
@@ -721,13 +720,12 @@ auto write(Float value, char* buffer) noexcept -> char* {
   using traits = float_traits<Float>;
   auto bits = traits::to_bits(value);
   // It is beneficial to compute exponent early.
-  auto raw_exp = traits::get_exp(bits);
+  auto bin_exp = traits::get_exp(bits);  // binary exponent
 
   *buffer = '-';
   buffer += traits::is_negative(bits);
 
   auto bin_sig = traits::get_sig(bits);  // binary significand
-  auto bin_exp = raw_exp;                // binary exponent
   bool special = ((bin_exp + 1) & traits::exp_mask) <= 1;
   bool regular = (bin_sig != 0) | special;  // | special slightly improves perf.
   if (special) [[ZMIJ_UNLIKELY]] {
@@ -740,13 +738,11 @@ auto write(Float value, char* buffer) noexcept -> char* {
       return buffer + 1;
     }
     bin_sig |= traits::implicit_bit;
-    bin_exp = 1;
   }
   bin_sig ^= traits::implicit_bit;
-  bin_exp -= traits::num_sig_bits + traits::exp_bias;
 
   // Here be 🐉s.
-  auto dec = ::to_decimal(bin_sig, bin_exp, raw_exp, regular, special);
+  auto dec = ::to_decimal<Float>(bin_sig, bin_exp, regular, special);
   int dec_exp = dec.exp;
 
   // Write significand.
