@@ -215,6 +215,12 @@ using uint128_t = unsigned __int128;
 using uint128_t = uint128;
 #endif  // ZMIJ_USE_INT128
 
+#if ZMIJ_USE_INT128 && defined(__APPLE__)
+constexpr bool use_umul128_hi64 = true;  // Use umul128_hi64 for division.
+#else
+constexpr bool use_umul128_hi64 = false;
+#endif
+
 // Computes 128-bit result of multiplication of two 64-bit unsigned integers.
 constexpr auto umul128(uint64_t x, uint64_t y) noexcept -> uint128_t {
 #if ZMIJ_USE_INT128
@@ -244,25 +250,25 @@ constexpr auto umul128(uint64_t x, uint64_t y) noexcept -> uint128_t {
 #endif  // ZMIJ_USE_INT128
 }
 
-constexpr auto umul128_upper64(uint64_t x, uint64_t y) noexcept -> uint64_t {
+constexpr auto umul128_hi64(uint64_t x, uint64_t y) noexcept -> uint64_t {
   return uint64_t(umul128(x, y) >> 64);
 }
 
-inline auto umul192_upper128(uint64_t x_hi, uint64_t x_lo, uint64_t y) noexcept
+inline auto umul192_hi128(uint64_t x_hi, uint64_t x_lo, uint64_t y) noexcept
     -> uint128 {
   uint128_t p = umul128(x_hi, y);
   uint64_t lo = uint64_t(p) + uint64_t(umul128(x_lo, y) >> 64);
   return {uint64_t(p >> 64) + (lo < uint64_t(p)), lo};
 }
 
-// Computes upper 64 bits of multiplication of x and y, discards the least
+// Computes high 64 bits of multiplication of x and y, discards the least
 // significant bit and rounds to odd, where x = uint128_t(x_hi << 64) | x_lo.
-auto umul_upper_inexact_to_odd(uint64_t x_hi, uint64_t x_lo,
-                               uint64_t y) noexcept -> uint64_t {
-  uint128 p = umul192_upper128(x_hi, x_lo, y);
+auto umulhi_inexact_to_odd(uint64_t x_hi, uint64_t x_lo, uint64_t y) noexcept
+    -> uint64_t {
+  uint128 p = umul192_hi128(x_hi, x_lo, y);
   return p.hi | ((p.lo >> 1) != 0);
 }
-auto umul_upper_inexact_to_odd(uint64_t x_hi, uint64_t, uint32_t y) noexcept
+auto umulhi_inexact_to_odd(uint64_t x_hi, uint64_t, uint32_t y) noexcept
     -> uint32_t {
   uint64_t p = uint64_t(umul128(x_hi, y) >> 32);
   return uint32_t(p >> 32) | ((uint32_t(p) >> 1) != 0);
@@ -343,13 +349,12 @@ struct pow10_significands_table {
         data[i * 2 + 1] = current.w1;
       }
 
-      uint64_t h0 = umul128_upper64(current.w0, ten);
-      uint64_t h1 = umul128_upper64(current.w1, ten);
+      uint64_t h0 = umul128_hi64(current.w0, ten);
+      uint64_t h1 = umul128_hi64(current.w1, ten);
 
       uint64_t c0 = h0 + current.w1 * ten;
       uint64_t c1 = (c0 < h0) + h1 + current.w2 * ten;
-      uint64_t c2 =
-          (c1 < h1) + umul128_upper64(current.w2, ten);  // dodgy carry
+      uint64_t c2 = (c1 < h1) + umul128_hi64(current.w2, ten);  // dodgy carry
 
       // normalise
       if (c2 >> 63)
@@ -682,11 +687,8 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int64_t raw_exp, bool regular,
   constexpr int num_bits = std::numeric_limits<UInt>::digits;
   // An optimization from yy by Yaoyuan Guo:
   while (regular & !subnormal) [[likely]] {
-#if defined(__APPLE__) && ZMIJ_USE_INT128
-    int dec_exp = (uint128_t(bin_exp) * 0x4d10500000000000) >> 64;
-#else
-    int dec_exp = compute_dec_exp(bin_exp, true);
-#endif
+    int dec_exp = use_umul128_hi64 ? umul128_hi64(bin_exp, 0x4d10500000000000)
+                                   : compute_dec_exp(bin_exp, true);
     unsigned char exp_shift =
         compute_exp_shift<num_bits, true>(bin_exp, dec_exp);
     uint128 pow10 = pow10_significands[-dec_exp];
@@ -694,7 +696,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int64_t raw_exp, bool regular,
     UInt integral = 0;        // integral part of bin_sig * pow10
     uint64_t fractional = 0;  // fractional part of bin_sig * pow10
     if (num_bits == 64) {
-      uint128 p = umul192_upper128(pow10.hi, pow10.lo, bin_sig << exp_shift);
+      uint128 p = umul192_hi128(pow10.hi, pow10.lo, bin_sig << exp_shift);
       integral = p.hi;
       fractional = p.lo;
     } else {
@@ -786,9 +788,9 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int64_t raw_exp, bool regular,
   // by multiplying them by the power of 10 and applying modified rounding.
   UInt lsb = bin_sig & 1;
   UInt lower = (bin_sig_shifted - (regular + 1)) << exp_shift;
-  lower = umul_upper_inexact_to_odd(pow10.hi, pow10.lo, lower) + lsb;
+  lower = umulhi_inexact_to_odd(pow10.hi, pow10.lo, lower) + lsb;
   UInt upper = (bin_sig_shifted + 2) << exp_shift;
-  upper = umul_upper_inexact_to_odd(pow10.hi, pow10.lo, upper) - lsb;
+  upper = umulhi_inexact_to_odd(pow10.hi, pow10.lo, upper) - lsb;
 
   // The idea of using a single shorter candidate is by Cassio Neri.
   // It is less or equal to the upper bound by construction.
@@ -796,8 +798,8 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int64_t raw_exp, bool regular,
   if ((shorter << bound_shift) >= lower)
     return normalize<num_bits>({int64_t(shorter), dec_exp}, subnormal);
 
-  UInt scaled_sig = umul_upper_inexact_to_odd(pow10.hi, pow10.lo,
-                                              bin_sig_shifted << exp_shift);
+  UInt scaled_sig =
+      umulhi_inexact_to_odd(pow10.hi, pow10.lo, bin_sig_shifted << exp_shift);
   UInt longer_below = scaled_sig >> bound_shift;
   UInt longer_above = longer_below + 1;
 
@@ -895,14 +897,10 @@ auto write(Float value, char* buffer) noexcept -> char* {
     return buffer + 2;
   }
 
-#if defined(__APPLE__) && ZMIJ_USE_INT128
-  // Use mulhi to divide by 100.
-  uint32_t digit = (uint128_t(dec_exp) * 0x290000000000000) >> 64;
-#else
-  // div100_exp=19 is faster or equal to 12 even for 3 digits.
-  uint32_t digit =
-      (uint32_t(dec_exp) * div100_sig) >> div100_exp;  // value / 100
-#endif
+  // digit = dec_exp / 100
+  uint32_t digit = use_umul128_hi64
+                       ? umul128_hi64(dec_exp, 0x290000000000000)
+                       : (uint32_t(dec_exp) * div100_sig) >> div100_exp;
   uint32_t digit_with_nuls = '0' + digit;
   if (is_big_endian()) digit_with_nuls <<= 24;
   memcpy(buffer, &digit_with_nuls, 4);
