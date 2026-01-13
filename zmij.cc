@@ -27,9 +27,15 @@ struct dec_fp {
 #  define ZMIJ_USE_SIMD 1
 #endif
 
+#ifdef _MSC_VER
+#  define ZMIJ_MSC_VER _MSC_VER
+#else
+#  define ZMIJ_MSC_VER 0
+#endif
+
 #ifdef ZMIJ_USE_NEON
 // Use the provided definition
-#elif defined(__ARM_NEON) || (defined(_MSC_VER) && defined(_M_ARM64))
+#elif defined(__ARM_NEON) || (ZMIJ_MSC_VER && defined(_M_ARM64))
 #  define ZMIJ_USE_NEON 1
 #else
 #  define ZMIJ_USE_NEON 0
@@ -39,7 +45,7 @@ struct dec_fp {
 // Use the provided definition
 #elif defined(__SSE2__)
 #  define ZMIJ_USE_SSE 1
-#elif defined(_MSC_VER) && \
+#elif ZMIJ_MSC_VER && \
     (defined(_M_AMD64) || (defined(_M_IX86_FP) && _M_IX86FP == 2))
 #  define ZMIJ_USE_SSE 1
 #else
@@ -50,7 +56,7 @@ struct dec_fp {
 // Use the provided definition
 #elif defined(__SSE4_1__)
 #  define ZMIJ_USE_SSE4_1 1
-#elif defined(_MSC_VER) && \
+#elif ZMIJ_MSC_VER && \
     defined(__AVX__)  // There's no way to check for /arch:SSE4.2 specifically
 #  define ZMIJ_USE_SSE4_1 1
 #else
@@ -70,7 +76,7 @@ struct dec_fp {
 #  include <immintrin.h>
 #endif
 
-#ifdef _MSC_VER
+#if ZMIJ_MSC_VER
 #  include <intrin.h>  // __lzcnt64/_umul128/__umulh
 #endif
 
@@ -106,7 +112,7 @@ struct dec_fp {
 
 #if ZMIJ_HAS_ATTRIBUTE(always_inline)
 #  define ZMIJ_INLINE __attribute__((always_inline)) inline
-#elif defined(_MSC_VER)
+#elif ZMIJ_MSC_VER
 #  define ZMIJ_INLINE __forceinline
 #else
 #  define ZMIJ_INLINE inline
@@ -136,7 +142,7 @@ inline auto is_big_endian() noexcept -> bool {
 inline auto bswap64(uint64_t x) noexcept -> uint64_t {
 #if ZMIJ_HAS_BUILTIN(__builtin_bswap64)
   return __builtin_bswap64(x);
-#elif defined(_MSC_VER)
+#elif ZMIJ_MSC_VER
   return _byteswap_uint64(x);
 #else
   return ((x & 0xff00000000000000) >> 56) | ((x & 0x00ff000000000000) >> 40) |
@@ -150,14 +156,14 @@ inline auto clz(uint64_t x) noexcept -> int {
   assert(x != 0);
 #if ZMIJ_HAS_BUILTIN(__builtin_clzll)
   return __builtin_clzll(x);
-#elif defined(_MSC_VER) && defined(__AVX2__) && defined(_M_AMD64)
+#elif ZMIJ_MSC_VER && defined(__AVX2__) && defined(_M_AMD64)
   // Use lzcnt only on AVX2-capable CPUs that have this BMI instruction.
   return __lzcnt64(x);
-#elif defined(_MSC_VER) && (defined(_M_AMD64) || defined(_M_ARM64))
+#elif ZMIJ_MSC_VER && (defined(_M_AMD64) || defined(_M_ARM64))
   unsigned long idx;
   _BitScanReverse64(&idx, x);  // Fallback to the BSR instruction.
   return 63 - idx;
-#elif defined(_MSC_VER)
+#elif ZMIJ_MSC_VER
   // Fallback to the 32-bit BSR instruction.
   unsigned long idx;
   if (_BitScanReverse(&idx, uint32_t(x >> 32))) return 31 - idx;
@@ -191,7 +197,7 @@ struct uint128 {
 
 [[ZMIJ_MAYBE_UNUSED]] inline auto operator+(uint128 lhs, uint128 rhs) noexcept
     -> uint128 {
-#if defined(_MSC_VER) && defined(_M_AMD64)
+#if ZMIJ_MSC_VER && defined(_M_AMD64)
   uint64_t lo, hi;
   _addcarry_u64(_addcarry_u64(0, lhs.lo, rhs.lo, &lo), lhs.hi, rhs.hi, &hi);
   return {hi, lo};
@@ -226,13 +232,13 @@ constexpr auto umul128(uint64_t x, uint64_t y) noexcept -> uint128_t {
 #if ZMIJ_USE_INT128
   return uint128_t(x) * y;
 #else
-#  if defined(_MSC_VER) && defined(_M_AMD64)
+#  if ZMIJ_MSC_VER && defined(_M_AMD64)
   if (!__builtin_is_constant_evaluated()) {
     uint64_t hi = 0;
     uint64_t lo = _umul128(x, y, &hi);
     return {hi, lo};
   }
-#  elif defined(_MSC_VER) && defined(_M_ARM64)
+#  elif ZMIJ_MSC_VER && defined(_M_ARM64)
   if (!__builtin_is_constant_evaluated()) return {__umulh(x, y), x * y};
 #  endif
   uint64_t a = x >> 32;
@@ -506,19 +512,16 @@ auto write_significand17(char* buffer, uint64_t value,
 #if ZMIJ_USE_NEON
   // An optimized version for NEON by Dougall Johnson.
   constexpr int32_t neg10k = -10000 + 0x10000;
-  struct to_string_constants {
-#  ifdef _MSC_VER
-    using int32x4_t = std::int32_t[4];
-    using int16x8_t = std::int16_t[8];
-#  endif
+  using int32x4 = std::conditional_t<ZMIJ_MSC_VER, int32_t[4], int32x4_t>;
+  using int16x8 = std::conditional_t<ZMIJ_MSC_VER, int16_t[8], int16x8_t>;
+  struct mul_constants {
     uint64_t mul_const = 0xabcc77118461cefd;
     uint64_t hundred_million = 100000000;
-    int32x4_t multipliers32 = {div10k_sig, neg10k, div100_sig << 12, neg100};
-    int16x8_t multipliers16 = {0xce0, neg10};
+    int32x4 multipliers32 = {div10k_sig, neg10k, div100_sig << 12, neg100};
+    int16x8 multipliers16 = {0xce0, neg10};
   };
-
-  static const to_string_constants constants;
-  const to_string_constants* c = &constants;
+  static const mul_constants constants;
+  const mul_constants* c = &constants;
 
   // Compiler barrier, or clang doesn't load from memory and generates 15 more
   // instructions
@@ -710,15 +713,17 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int64_t raw_exp, bool regular,
     if (fractional == half_ulp) [[ZMIJ_UNLIKELY]]
       break;
 
-#if ZMIJ_USE_INT128
-    // An optimization of integral % 10 by Dougall Johnson.
-    // Relies on range calculation: (max_bin_sig << max_exp_shift) * max_u128.
-    uint64_t quo10 = (integral * ((uint128_t(1) << 64) / 10 + 1)) >> 64;
-    uint64_t digit = integral - quo10 * 10;
-    asm("" : "+r"(digit));  // or it narrows to 32-bit and doesn't use madd/msub
-#else
-    uint64_t digit = integral % 10;
-#endif
+    uint64_t digit;
+    if (ZMIJ_USE_INT128) {
+      // An optimization of integral % 10 by Dougall Johnson.
+      // Relies on range calculation: (max_bin_sig << max_exp_shift) * max_u128.
+      constexpr uint64_t div10_sig = (1ull << 63) / 5 + 1;
+      digit = integral - umul128_hi64(integral, div10_sig) * 10;
+      // or it narrows to 32-bit and doesn't use madd/msub
+      ZMIJ_ASM(("" : "+r"(digit)));
+    } else {
+      digit = integral % 10;
+    }
 
     // Switch to a fixed-point representation with the least significant
     // integral digit in the upper bits and fractional digits in the lower bits.
