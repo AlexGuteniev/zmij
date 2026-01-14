@@ -90,3 +90,42 @@ taking the best of 3 runs.
 to a mythical dragon- or serpent-like creature. This continues the dragon theme [started
 by Steele and White](https://fmt.dev/papers/p372-steele.pdf). Nice feature of this name
 is that it has a floating point in the first letter.
+
+## Acknowledgements
+
+We would like to express our gratitude to the individuals who have made
+**Żmij** possible:
+
+* Victor Zverovich — Original author and maintainer of Żmij.
+
+* Tobias Schlüter — Contributed significant performance and portability
+  improvements, including SIMD/SSE support and core algorithm refinements that
+  enhance execution speed and cross-platform compatibility.
+
+* Dougall Johnson — Provided numerous optimization ideas and major contributions
+  to the NEON implementation, significantly improving performance and ARM
+  support.
+
+* Alex Guteniev — Contributed multiple fixes and improvements across build
+  systems, platform compatibility, and testing infrastructure.
+
+* Xiang JunBo — Contributed high-performance BCD digit extraction algorithm and
+  additional optimization ideas used across scalar and SIMD code paths.
+
+* David Tolnay — Created and maintains the Rust port of Żmij, expanding the
+  algorithm's reach and adoption in the Rust ecosystem.
+
+* Raffaello Giulietti — Author of the Schubfach algorithm, whose work forms a
+  foundational basis for Żmij.
+
+* Yaoyuan Guo — Author of the yy algorithm, whose ideas influenced key
+  optimizations used in Żmij.
+
+* Cassio Neri — Proposed the single-candidate rounding strategy used in Żmij’s
+  boundary handling logic.
+
+* Junekey Jeon — Author of the Dragonbox algorithm, which informed design and
+  benchmarking comparisons for Żmij.
+
+* Community contributors who provided feedback, issues, suggestions, and
+  occasional commits, helping improve the robustness and performance of Żmij.
