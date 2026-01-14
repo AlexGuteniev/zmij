@@ -1,7 +1,8 @@
 # 🐉 Żmij
 
-A double-to-string conversion algorithm based on [Schubfach](https://fmt.dev/papers/Schubfach4.pdf)
-and [yy](https://github.com/ibireme/c_numconv_benchmark/blob/master/vendor/yy_double/yy_double.c)
+A double-to-string conversion algorithm based on [Schubfach](
+https://fmt.dev/papers/Schubfach4.pdf) and [yy](
+https://github.com/ibireme/c_numconv_benchmark/blob/master/vendor/yy_double)
 with implementations in C and C++
 
 ## Features
@@ -14,8 +15,9 @@ with implementations in C and C++
 * IEEE 754 `double` and `float` support
 * Safer API than classic `dtoa`
 * Negative zero dependencies
-* Small, clean codebase consisting of one [source file](
-  https://github.com/vitaut/zmij/blob/main/zmij.cc) and an optional [header](https://github.com/vitaut/zmij/blob/main/zmij.h)
+* Small, clean codebase consisting of one
+  [source file](https://github.com/vitaut/zmij/blob/main/zmij.cc) and an
+  optional [header](https://github.com/vitaut/zmij/blob/main/zmij.h)
 * Permissive [license](https://github.com/vitaut/zmij/blob/main/LICENSE)
 
 ## Usage
@@ -57,16 +59,19 @@ on [dtoa-benchmark](https://github.com/fmtlib/dtoa-benchmark) run on Apple M1.
 
 **Conversion time (smaller is better):**
 
-<img width="816" height="358" alt="image" src="https://github.com/user-attachments/assets/c6eea19d-f824-4069-bc26-d701a419916e" />
+<img width="816" height="358" alt="image"
+  src="https://github.com/user-attachments/assets/c6eea19d-f824-4069-bc26-d701a419916e" />
 
 `ostringstream` and `sprintf` are excluded due to their significantly slower
 performance.
 
-<img width="857" height="687" alt="image" src="https://github.com/user-attachments/assets/13cb86d3-4d76-4903-a13e-d4845a4388b4" />
+<img width="857" height="687" alt="image"
+  src="https://github.com/user-attachments/assets/13cb86d3-4d76-4903-a13e-d4845a4388b4" />
 
 ## Compile time
 
-Compile time is ~135ms by default and ~155ms with optimizations enabled as measured by
+Compile time is ~135ms by default and ~155ms with optimizations enabled as
+measured by
 
 ```
 % time c++ -c zmij.cc [-O2]
@@ -76,7 +81,8 @@ taking the best of 3 runs.
 
 ## Languages
 
-* C++: https://github.com/vitaut/zmij/blob/main/zmij.cc (reference implementation)
+* C++: https://github.com/vitaut/zmij/blob/main/zmij.cc
+  (reference implementation)
 * C: https://github.com/vitaut/zmij/blob/main/zmij.c
 * Rust: https://github.com/dtolnay/zmij
 * Zig: https://github.com/de-sh/zmij
@@ -93,10 +99,12 @@ taking the best of 3 runs.
 
 ## Name
 
-Żmij (pronounced roughly zhmeey or more precisely /ʐmij/) is a Polish word that refers
-to a mythical dragon- or serpent-like creature. This continues the dragon theme [started
-by Steele and White](https://fmt.dev/papers/p372-steele.pdf). Nice feature of this name
-is that it has a floating point in the first letter.
+Żmij (pronounced roughly zhmeey or more precisely /ʐmij/) is a Polish word that
+refers to a mythical dragon- or serpent-like creature, continuing the dragon
+theme [started by Steele and White](https://fmt.dev/papers/p372-steele.pdf).
+
+A nice bonus is that the name even contains a “floating point” in its first
+letter.
 
 ## Acknowledgements
 
