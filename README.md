@@ -96,36 +96,42 @@ is that it has a floating point in the first letter.
 We would like to express our gratitude to the individuals who have made
 **Żmij** possible:
 
-* Victor Zverovich — Original author and maintainer of Żmij.
+* Victor Zverovich ([@vitaut](https://github.com/vitaut)) - Original author and
+  maintainer of Żmij.
 
-* Tobias Schlüter — Contributed significant performance and portability
-  improvements, including SIMD/SSE support and core algorithm refinements that
-  enhance execution speed and cross-platform compatibility.
+* Tobias Schlüter ([@TobiSchluter](https://github.com/TobiSchluter)) -
+  Contributed significant performance and portability improvements, including
+  SIMD/SSE support and core algorithm refinements that enhance execution speed
+  and cross-platform compatibility.
 
-* Dougall Johnson — Provided numerous optimization ideas and major contributions
-  to the NEON implementation, significantly improving performance and ARM
-  support.
+* Dougall Johnson ([@dougallj](https://github.com/dougallj)) – Authored the
+  NEON implementation and contributed many optimization ideas, substantially
+  improving performance on ARM platforms.
 
-* Alex Guteniev — Contributed multiple fixes and improvements across build
-  systems, platform compatibility, and testing infrastructure.
+* Alex Guteniev ([@AlexGuteniev](https://github.com/AlexGuteniev)) -
+  Contributed multiple fixes and improvements across build systems, platform
+  compatibility, and testing infrastructure.
 
-* Xiang JunBo — Contributed high-performance BCD digit extraction algorithm and
-  additional optimization ideas used across scalar and SIMD code paths.
+* Xiang JunBo ([@xjb714](https://github.com/xjb714)) - Contributed
+  high-performance BCD digit extraction algorithm and additional optimization
+  ideas used across scalar and SIMD code paths.
 
-* David Tolnay — Created and maintains the Rust port of Żmij, expanding the
+* David Tolnay ([@dtolnay](https://github.com/dtolnay)) - Created and maintains
+  the [Rust port of Żmij](https://github.com/dtolnay/zmij), expanding the
   algorithm's reach and adoption in the Rust ecosystem.
 
-* Raffaello Giulietti — Author of the Schubfach algorithm, whose work forms a
+* Raffaello Giulietti - Author of the Schubfach algorithm, whose work forms a
   foundational basis for Żmij.
 
-* Yaoyuan Guo — Author of the yy algorithm, whose ideas influenced key
-  optimizations used in Żmij.
+* Yaoyuan Guo ([@ibireme](https://github.com/ibireme)) - Author of the yy
+  algorithm, whose ideas influenced key optimizations used in Żmij.
 
-* Cassio Neri — Proposed the single-candidate rounding strategy used in Żmij’s
-  boundary handling logic.
+* Cassio Neri ([@cassioneri](https://github.com/cassioneri)) - Proposed the
+  single-candidate rounding strategy used in Żmij.
 
-* Junekey Jeon — Author of the Dragonbox algorithm, which informed design and
-  benchmarking comparisons for Żmij.
+* Junekey Jeon ([@jk-jeon](https://github.com/jk-jeon)) - Author of the
+  Dragonbox algorithm, which informed design and benchmarking comparisons for
+  Żmij.
 
 * Community contributors who provided feedback, issues, suggestions, and
   occasional commits, helping improve the robustness and performance of Żmij.
