@@ -27,13 +27,6 @@ struct dec_fp {
 #  define ZMIJ_USE_SIMD 1
 #endif
 
-#ifdef _MSC_VER
-#  define ZMIJ_MSC_VER _MSC_VER
-#  include <intrin.h>  // __lzcnt64/_umul128/__umulh
-#else
-#  define ZMIJ_MSC_VER 0
-#endif
-
 #ifdef ZMIJ_USE_NEON
 // Use the provided definition
 #elif defined(__ARM_NEON) || defined(_M_ARM64)
@@ -61,13 +54,18 @@ struct dec_fp {
 #ifdef ZMIJ_USE_SSE4_1
 // Use the provided definition
 static_assert(!ZMIJ_USE_SSE4_1 || ZMIJ_USE_SSE);
-#elif defined(__SSE4_1__)
-#  define ZMIJ_USE_SSE4_1 ZMIJ_USE_SIMD
-#elif ZMIJ_MSC_VER && \
-    defined(__AVX__)  // There's no way to check for /arch:SSE4.2 specifically
+#elif defined(__SSE4_1__) || defined(__AVX__)
+// On MSVC there's no way to check for SSE4.1 specifically so check __AVX__.
 #  define ZMIJ_USE_SSE4_1 ZMIJ_USE_SIMD
 #else
 #  define ZMIJ_USE_SSE4_1 0
+#endif
+
+#ifdef _MSC_VER
+#  define ZMIJ_MSC_VER _MSC_VER
+#  include <intrin.h>  // __lzcnt64/_umul128/__umulh
+#else
+#  define ZMIJ_MSC_VER 0
 #endif
 
 #if defined(__has_builtin) && !defined(ZMIJ_NO_BUILTINS)
@@ -146,7 +144,7 @@ inline auto clz(uint64_t x) noexcept -> int {
   assert(x != 0);
 #if ZMIJ_HAS_BUILTIN(__builtin_clzll)
   return __builtin_clzll(x);
-#elif defined(__AVX2__) && defined(_M_AMD64)
+#elif defined(_M_AMD64) && defined(__AVX2__)
   // Use lzcnt only on AVX2-capable CPUs that have this BMI instruction.
   return __lzcnt64(x);
 #elif defined(_M_AMD64) || defined(_M_ARM64)
@@ -326,13 +324,13 @@ struct pow10_significands_table {
     return {hi[-dec_exp], lo[-dec_exp]};
   }
 
-  constexpr pow10_significands_table() noexcept {
+  constexpr pow10_significands_table() {
     struct uint192 {
       uint64_t w0, w1, w2;  // w0 = least significant, w2 = most significant
     };
 
-    // first element, rounded up to cancel out rounding down in the
-    // multiplication, and minimise significant bits
+    // First element, rounded up to cancel out rounding down in the
+    // multiplication, and minimize significant bits.
     uint192 current = {0xe000000000000000, 0x25e8e89c13bb0f7a,
                        0xff77b1fcbebcdc4f};
     uint64_t ten = 0xa000000000000000;
@@ -463,6 +461,8 @@ constexpr uint32_t neg100 = (1 << 16) - 100;
 constexpr int div10_exp = 10;
 constexpr uint32_t div10_sig = (1 << div10_exp) / 10 + 1;
 constexpr uint32_t neg10 = (1 << 8) - 10;
+// (1 << 63) / 5 == (1 << 64) / 10 without an intermediate int128.
+constexpr uint64_t div10_sig64 = (1ull << 63) / 5 + 1;
 
 constexpr uint64_t zeros = 0x0101010101010101u * '0';
 
@@ -571,10 +571,8 @@ auto write_significand17(char* buffer, uint64_t value,
   buffer += 16 - ((zeroes != 0 ? clz(zeroes) : 64) >> 2);
   return buffer - int(buffer - start == 1);
 #elif ZMIJ_USE_SSE
-  // Divide by ten with a 64bit shift.  Note that (1 << 63) / 5 == (1 << 64) /
-  // 10 but doesn't need an intermediate int128.
   uint64_t digits_16 =
-      use_umul128_hi64 ? umul128_hi64((1ull << 63) / 5 + 1, value) : value / 10;
+      use_umul128_hi64 ? umul128_hi64(value, div10_sig64) : value / 10;
   uint32_t last_digit = value - digits_16 * 10;
 
   // We always write 17 digits into the buffer, but the first one can be zero.
@@ -596,7 +594,7 @@ auto write_significand17(char* buffer, uint64_t value,
     __m128i neg10 = _mm_set1_epi16((1 << 8) - 10);
     __m128i bswap =
         _mm_set_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
-#  else   // !ZMIJ_USE_SSE4_1
+#  else
     __m128i hundred = _mm_set1_epi32(100);
     __m128i moddiv10 = _mm_set1_epi16(10 * (1 << 8) - 1);
 #  endif  // ZMIJ_USE_SSE4_1
@@ -616,7 +614,7 @@ auto write_significand17(char* buffer, uint64_t value,
   __m128i big_endian_bcd =
       _mm_add_epi16(z, _mm_mullo_epi16(c.neg10, _mm_mulhi_epu16(z, c.div10)));
   __m128i bcd = _mm_shuffle_epi8(big_endian_bcd, c.bswap);  // SSSE3
-#  else   // !ZMIJ_USE_SSE4_1
+#  else
   __m128i y_div_100 = _mm_srli_epi16(_mm_mulhi_epu16(y, c.div100), 3);
   __m128i y_mod_100 = _mm_sub_epi16(y, _mm_mullo_epi16(y_div_100, c.hundred));
   __m128i z = _mm_or_si128(_mm_slli_epi32(y_mod_100, 16), y_div_100);
@@ -718,8 +716,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int64_t raw_exp, bool regular,
     if (ZMIJ_USE_INT128) {
       // An optimization of integral % 10 by Dougall Johnson.
       // Relies on range calculation: (max_bin_sig << max_exp_shift) * max_u128.
-      constexpr uint64_t div10_sig = (1ull << 63) / 5 + 1;
-      digit = integral - umul128_hi64(integral, div10_sig) * 10;
+      digit = integral - umul128_hi64(integral, div10_sig64) * 10;
       // or it narrows to 32-bit and doesn't use madd/msub
       ZMIJ_ASM(("" : "+r"(digit)));
     } else {
