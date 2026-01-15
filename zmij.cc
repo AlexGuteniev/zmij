@@ -435,7 +435,7 @@ inline auto count_trailing_nonzeros(uint64_t x) noexcept -> int {
   // datum left by one and inserting a sentinel bit at the end. This can
   // be faster than the automatically inserted range check.
   if (is_big_endian()) x = bswap64(x);
-  return (70 - clz((x << 1) | 1)) / 8;
+  return (size_t(70) - clz((x << 1) | 1)) / 8;  // size_t for native arithmetic
 }
 
 // Converts value in the range [0, 100) to a string. GCC generates a bit better
@@ -634,7 +634,7 @@ auto write_significand17(char* buffer, uint64_t value,
   // is the last digit which we factored off. But in that case the number would
   // be printed with a different exponent that shifts the last digit into the
   // first position.
-  auto len = 64 - clz(mask);
+  auto len = size_t(64) - clz(mask);  // size_t for native arithmetic
 
   _mm_storeu_si128(reinterpret_cast<__m128i*>(buffer), digits);
   return buffer + ((last_digit != 0) ? 17 : len - (len == 1));
