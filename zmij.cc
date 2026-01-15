@@ -768,8 +768,13 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int64_t raw_exp, bool regular,
     }
 
     bool round_up = upper >= ten;
-    int64_t shorter = int64_t(integral - digit + round_up * 10);
+    int64_t shorter = int64_t(integral - digit);
     int64_t longer = int64_t(integral + (fractional >= half_ulp));
+#ifdef __aarch64__  // Faster version without ccmp.
+    int64_t dec_sig = scaled_sig_mod10 < scaled_half_ulp ? shorter : longer;
+    return {round_up ? shorter + 10 : dec_sig, dec_exp};
+#endif
+    shorter += round_up * 10;
     bool use_shorter = (scaled_sig_mod10 <= scaled_half_ulp) + round_up != 0;
     return {use_shorter ? shorter : longer, dec_exp};
   }
