@@ -709,7 +709,8 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int64_t raw_exp, bool regular,
     constexpr uint64_t half_ulp = uint64_t(1) << 63;
 
     // Exact half-ulp tie when rounding to nearest integer.
-    if (fractional == half_ulp) [[ZMIJ_UNLIKELY]]
+    int64_t cmp = int64_t(fractional - half_ulp);
+    if (cmp == 0) [[ZMIJ_UNLIKELY]]
       break;
 
     uint64_t digit;
@@ -769,7 +770,7 @@ ZMIJ_INLINE auto to_decimal(UInt bin_sig, int64_t raw_exp, bool regular,
 
     bool round_up = upper >= ten;
     int64_t shorter = int64_t(integral - digit);
-    int64_t longer = int64_t(integral + (fractional >= half_ulp));
+    int64_t longer = int64_t(integral + (cmp >= 0));
 #ifdef __aarch64__  // Faster version without ccmp.
     int64_t dec_sig = scaled_sig_mod10 < scaled_half_ulp ? shorter : longer;
     return {round_up ? shorter + 10 : dec_sig, dec_exp};
