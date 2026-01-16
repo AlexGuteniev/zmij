@@ -504,8 +504,8 @@ auto write_significand17(char* buffer, uint64_t value,
 #if ZMIJ_USE_NEON
   // An optimized version for NEON by Dougall Johnson.
   constexpr int32_t neg10k = -10000 + 0x10000;
-  using int32x4 = std::conditional_t<ZMIJ_MSC_VER, int32_t[4], int32x4_t>;
-  using int16x8 = std::conditional_t<ZMIJ_MSC_VER, int16_t[8], int16x8_t>;
+  using int32x4 = std::conditional_t<ZMIJ_MSC_VER != 0, int32_t[4], int32x4_t>;
+  using int16x8 = std::conditional_t<ZMIJ_MSC_VER != 0, int16_t[8], int16x8_t>;
   struct mul_constants {
     uint64_t mul_const = 0xabcc77118461cefd;
     uint64_t hundred_million = 100000000;
