@@ -707,24 +707,19 @@ auto write_significand9(char* buffer, uint32_t value, bool has9digits) noexcept
 struct to_decimal_result {
   long long sig;
   int exp;
-  static constexpr long long sig_div10 = 0;
-  void set_div10(long long) {}
-};
 
-struct to_decimal_result_sse {
-  long long sig;
-  int exp;
+#if ZMIJ_USE_SSE
   long long sig_div10;
   void set_div10(long long value) { sig_div10 = value; }
+#else
+  static constexpr long long sig_div10 = 0;
+  void set_div10(long long) {}
+#endif
 };
 
-using to_decimal_result_t =
-    std::conditional_t<ZMIJ_USE_SSE != 0, to_decimal_result_sse,
-                       to_decimal_result>;
-
 template <int num_bits>
-auto normalize(to_decimal_result_t dec, bool subnormal) noexcept
-    -> to_decimal_result_t {
+auto normalize(to_decimal_result dec, bool subnormal) noexcept
+    -> to_decimal_result {
   if (!subnormal) [[ZMIJ_LIKELY]]
     return dec;
   while (dec.sig < (num_bits == 64 ? uint64_t(1e16) : uint64_t(1e8))) {
@@ -737,7 +732,7 @@ auto normalize(to_decimal_result_t dec, bool subnormal) noexcept
 
 template <bool subnormal = false, typename UInt>
 auto to_decimal_schubfach(UInt bin_sig, int64_t bin_exp, bool regular) noexcept
-    -> to_decimal_result_t {
+    -> to_decimal_result {
   constexpr int num_bits = std::numeric_limits<UInt>::digits;
   int dec_exp = compute_dec_exp(bin_exp, regular);
   unsigned char exp_shift = compute_exp_shift<num_bits>(bin_exp, dec_exp);
@@ -764,7 +759,7 @@ auto to_decimal_schubfach(UInt bin_sig, int64_t bin_exp, bool regular) noexcept
   long long div10 = (upper >> bound_shift) / 10;
   UInt shorter = div10 * 10;
   if ((shorter << bound_shift) >= lower) {
-    to_decimal_result_t result = {int64_t(shorter), dec_exp};
+    to_decimal_result result = {int64_t(shorter), dec_exp};
     result.set_div10(div10);
     return normalize<num_bits>(result, subnormal);
   }
@@ -781,7 +776,7 @@ auto to_decimal_schubfach(UInt bin_sig, int64_t bin_exp, bool regular) noexcept
   bool below_closer = cmp < 0 || (cmp == 0 && (longer_below & 1) == 0);
   bool below_in = (longer_below << bound_shift) >= lower;
   UInt dec_sig = (below_closer & below_in) ? longer_below : longer_above;
-  to_decimal_result_t result = {int64_t(dec_sig), dec_exp};
+  to_decimal_result result = {int64_t(dec_sig), dec_exp};
   result.set_div10(dec_sig / 10);
   return normalize<num_bits>(result, subnormal);
 }
@@ -791,8 +786,7 @@ auto to_decimal_schubfach(UInt bin_sig, int64_t bin_exp, bool regular) noexcept
 // representation, where bin_exp = raw_exp - exp_offset.
 template <typename Float, typename UInt>
 ZMIJ_INLINE auto to_decimal_normal(UInt bin_sig, int64_t raw_exp,
-                                   bool regular) noexcept
-    -> to_decimal_result_t {
+                                   bool regular) noexcept -> to_decimal_result {
   using traits = float_traits<Float>;
   int64_t bin_exp = raw_exp - traits::exp_offset;
   constexpr int num_bits = std::numeric_limits<UInt>::digits;
@@ -885,7 +879,7 @@ ZMIJ_INLINE auto to_decimal_normal(UInt bin_sig, int64_t raw_exp,
     }
     shorter += round_up * 10;
     bool use_shorter = (scaled_sig_mod10 <= scaled_half_ulp) + round_up != 0;
-    to_decimal_result_t result = {use_shorter ? shorter : longer, dec_exp};
+    to_decimal_result result = {use_shorter ? shorter : longer, dec_exp};
     result.set_div10(div10 + use_shorter * round_up);
     return result;
   }
@@ -901,7 +895,7 @@ inline auto to_decimal(double value) noexcept -> dec_fp {
   auto bits = traits::to_bits(value);
   auto bin_exp = traits::get_exp(bits);  // binary exponent
   auto bin_sig = traits::get_sig(bits);  // binary significand
-  to_decimal_result_t dec;
+  to_decimal_result dec;
   if (bin_exp == 0 || bin_exp == traits::exp_mask) [[ZMIJ_UNLIKELY]] {
     if (bin_exp != 0) return {0, int(~0u >> 1)};
     if (bin_sig == 0) return {0, 0};
@@ -927,7 +921,7 @@ auto write(Float value, char* buffer) noexcept -> char* {
   *buffer = '-';
   buffer += traits::is_negative(bits);
 
-  to_decimal_result_t dec;
+  to_decimal_result dec;
   if (bin_exp == 0 || bin_exp == traits::exp_mask) [[ZMIJ_UNLIKELY]] {
     if (bin_exp != 0) {
       memcpy(buffer, bin_sig == 0 ? "inf" : "nan", 4);
