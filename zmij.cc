@@ -462,8 +462,6 @@ constexpr uint32_t neg100 = (1 << 16) - 100;
 constexpr int div10_exp = 10;
 constexpr uint32_t div10_sig = (1 << div10_exp) / 10 + 1;
 constexpr uint32_t neg10 = (1 << 8) - 10;
-// (1 << 63) / 5 == (1 << 64) / 10 without an intermediate int128.
-constexpr uint64_t div10_sig64 = (1ull << 63) / 5 + 1;
 
 constexpr uint64_t zeros = 0x0101010101010101u * '0';
 
@@ -612,8 +610,7 @@ auto write_significand17(char* buffer, uint64_t value, bool has17digits,
   buffer += 16 - ((zeroes != 0 ? clz(zeroes) : 64) >> 2);
   return buffer - int(buffer - start == 1);
 #elif ZMIJ_USE_SSE
-  uint64_t digits_16 = value_div10;
-  uint32_t last_digit = value - digits_16 * 10;
+  uint32_t last_digit = value - value_div10 * 10;
 
   // We always write 17 digits into the buffer, but the first one can be zero.
   // buffer points to the second place in the output buffer to allow for the
@@ -621,8 +618,8 @@ auto write_significand17(char* buffer, uint64_t value, bool has17digits,
   buffer += has17digits;
   buffer[16] = char(last_digit + '0');
 
-  uint32_t abcdefgh = digits_16 / uint64_t(1e8);
-  uint32_t ijklmnop = digits_16 % uint64_t(1e8);
+  uint32_t abcdefgh = value_div10 / uint64_t(1e8);
+  uint32_t ijklmnop = value_div10 % uint64_t(1e8);
 
   alignas(64) static constexpr struct {
     __m128i div10k = splat64(div10k_sig);
@@ -827,6 +824,8 @@ ZMIJ_INLINE auto to_decimal_normal(UInt bin_sig, int64_t raw_exp,
 
     // An optimization of integral % 10 by Dougall Johnson.
     // Relies on range calculation: (max_bin_sig << max_exp_shift) * max_u128.
+    // (1 << 63) / 5 == (1 << 64) / 10 without an intermediate int128.
+    constexpr uint64_t div10_sig64 = (1ull << 63) / 5 + 1;
     long long div10 =
         ZMIJ_USE_INT128 ? umul128_hi64(integral, div10_sig64) : integral / 10;
     uint64_t digit = integral - div10 * 10;
