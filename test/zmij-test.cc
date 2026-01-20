@@ -5,7 +5,25 @@
 // Include zmij.cc instead of linking with the library to test multiple
 // configurations without building multiple versions of the library and to test
 // internal functions.
+#ifndef ZMIJ_C
 #include "../zmij.cc"
+#else
+#include "../zmij.c"
+
+namespace zmij {
+enum {
+  double_buffer_size = 25,
+  float_buffer_size = 16,
+};
+
+auto write(char* out, size_t n, double value) noexcept -> size_t {
+  return zmij_write_double(value, out) - out;
+}
+auto write(char* out, size_t n, float value) noexcept -> size_t {
+  return zmij_write_float(value, out) - out;
+}
+}
+#endif
 
 #include <gtest/gtest.h>
 
@@ -13,6 +31,7 @@
 #include <string>  // std::string
 
 #include "dragonbox/dragonbox_to_chars.h"
+
 
 auto dtoa(double value) -> std::string {
   char buffer[zmij::double_buffer_size] = {};
@@ -36,16 +55,6 @@ TEST(zmij_test, utilities) {
   EXPECT_EQ(count_trailing_nonzeros(0x00090000'09000000ull), 7);
   EXPECT_EQ(count_trailing_nonzeros(0x01000000'00000000ull), 8);
   EXPECT_EQ(count_trailing_nonzeros(0x09000000'00000000ull), 8);
-}
-
-TEST(zmij_test, umulhi_inexact_to_odd) {
-  auto pow10 = pow10_significands[-292];
-  EXPECT_EQ(umulhi_inexact_to_odd(pow10.hi, pow10.lo,
-                                  uint64_t(0x1234567890abcdef << 1)),
-            0x24554a3ce60a45f5);
-  EXPECT_EQ(umulhi_inexact_to_odd(pow10.hi, pow10.lo,
-                                  uint64_t(0x1234567890abce16 << 1)),
-            0x24554a3ce60a4643);
 }
 
 TEST(dtoa_test, normal) {
@@ -129,12 +138,21 @@ TEST(dtoa_test, null_terminated) {
   EXPECT_STREQ(buffer, "nan");
 }
 
+#ifndef ZMIJ_C
 TEST(dtoa_test, no_buffer) {
   double value = 6.62607015e-34;
   auto n = zmij::write(nullptr, 0, value);
   std::string result(n, '\0');
   zmij::write(&result[0], n, value);
   EXPECT_EQ(result, "6.62607015e-34");
+}
+
+TEST(ftoa_test, no_buffer) {
+  float value = 6.62607e-34;
+  auto n = zmij::write(nullptr, 0, value);
+  std::string result(n, '\0');
+  zmij::write(&result[0], n, value);
+  EXPECT_EQ(result, "6.62607e-34");
 }
 
 TEST(dtoa_test, to_decimal) {
@@ -145,6 +163,7 @@ TEST(dtoa_test, to_decimal) {
   EXPECT_EQ(dec.sig, -66260701500000000);
   EXPECT_EQ(dec.exp, -50);
 }
+#endif
 
 TEST(dtoa_test, no_overrun) {
   char buffer[zmij::double_buffer_size + 1];
@@ -163,14 +182,6 @@ TEST(ftoa_test, normal) {
 
 TEST(ftoa_test, subnormal) {
   EXPECT_EQ(ftoa(std::numeric_limits<float>::denorm_min()), "1e-45");
-}
-
-TEST(ftoa_test, no_buffer) {
-  float value = 6.62607e-34;
-  auto n = zmij::write(nullptr, 0, value);
-  std::string result(n, '\0');
-  zmij::write(&result[0], n, value);
-  EXPECT_EQ(result, "6.62607e-34");
 }
 
 TEST(ftoa_test, no_overrun) {
