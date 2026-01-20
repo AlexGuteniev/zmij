@@ -70,7 +70,7 @@ performance.
 
 ## Compile time
 
-Compile time is ~135ms by default and ~155ms with optimizations enabled as
+Compile time is ~135ms by default and ~180ms with optimizations enabled as
 measured by
 
 ```
