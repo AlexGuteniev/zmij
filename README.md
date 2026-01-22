@@ -165,7 +165,7 @@ We would like to express our gratitude to the individuals who have made
 
 * Junekey Jeon ([@jk-jeon](https://github.com/jk-jeon)) - Author of the
   Dragonbox algorithm, which informed design and benchmarking comparisons for
-  Żmij.
+  Żmij, as well as the `to_decimal` API.
 
 * Community contributors who provided feedback, issues, suggestions, and
   occasional commits, helping improve the robustness and performance of Żmij.
