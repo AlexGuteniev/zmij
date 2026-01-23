@@ -708,21 +708,9 @@ struct to_decimal_result {
 #endif
 };
 
-template <int num_bits>
-auto normalize(to_decimal_result dec, bool subnormal) noexcept
-    -> to_decimal_result {
-  if (!subnormal) [[ZMIJ_LIKELY]]
-    return dec;
-  while (dec.sig < (num_bits == 64 ? uint64_t(1e16) : uint64_t(1e8))) {
-    dec.sig *= 10;
-    --dec.exp;
-  }
-  dec.set_div10(dec.sig / 10);
-  return dec;
-}
-
-template <bool subnormal = false, typename UInt>
-auto to_decimal_schubfach(UInt bin_sig, int64_t bin_exp, bool regular) noexcept
+template <typename UInt>
+ZMIJ_INLINE auto to_decimal_schubfach(UInt bin_sig, int64_t bin_exp,
+                                      bool regular) noexcept
     -> to_decimal_result {
   constexpr int num_bits = std::numeric_limits<UInt>::digits;
   int dec_exp = compute_dec_exp(bin_exp, regular);
@@ -752,7 +740,7 @@ auto to_decimal_schubfach(UInt bin_sig, int64_t bin_exp, bool regular) noexcept
   if ((shorter << bound_shift) >= lower) {
     to_decimal_result result = {int64_t(shorter), dec_exp};
     result.set_div10(div10);
-    return normalize<num_bits>(result, subnormal);
+    return result;
   }
 
   UInt scaled_sig =
@@ -769,7 +757,7 @@ auto to_decimal_schubfach(UInt bin_sig, int64_t bin_exp, bool regular) noexcept
   UInt dec_sig = (below_closer & below_in) ? longer_below : longer_above;
   to_decimal_result result = {int64_t(dec_sig), dec_exp};
   result.set_div10(dec_sig / 10);
-  return normalize<num_bits>(result, subnormal);
+  return result;
 }
 
 // Here be 🐉s.
@@ -890,7 +878,7 @@ inline auto to_decimal(double value) noexcept -> dec_fp {
   if (bin_exp == 0 || bin_exp == traits::exp_mask) [[ZMIJ_UNLIKELY]] {
     if (bin_exp != 0) return {0, int(~0u >> 1)};
     if (bin_sig == 0) return {0, 0};
-    dec = to_decimal_schubfach<true>(bin_sig, 1 - traits::exp_offset, true);
+    dec = to_decimal_schubfach(bin_sig, 1 - traits::exp_offset, true);
   } else {
     dec = to_decimal_normal<double>(bin_sig | traits::implicit_bit, bin_exp,
                                     bin_sig != 0);
@@ -922,7 +910,12 @@ auto write(Float value, char* buffer) noexcept -> char* {
       memcpy(buffer, "0", 2);
       return buffer + 1;
     }
-    dec = to_decimal_schubfach<true>(bin_sig, 1 - traits::exp_offset, true);
+    dec = to_decimal_schubfach(bin_sig, 1 - traits::exp_offset, true);
+    while (dec.sig < uint64_t(traits::num_bits == 64 ? 1e16 : 1e8)) {
+      dec.sig *= 10;
+      --dec.exp;
+    }
+    dec.set_div10(dec.sig / 10);
   } else {
     dec = to_decimal_normal<Float>(bin_sig | traits::implicit_bit, bin_exp,
                                    bin_sig != 0);
