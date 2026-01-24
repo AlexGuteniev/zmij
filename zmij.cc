@@ -869,14 +869,14 @@ ZMIJ_INLINE auto to_decimal_normal(UInt bin_sig, int64_t raw_exp,
 }
 
 template <int num_bits>
-auto write_fixed(char* buffer, uint64_t dec_sig, int dec_exp, bool has17digits,
+auto write_fixed(char* buffer, uint64_t dec_sig, int dec_exp, bool extra_digit,
                  long long dec_sig_div10) noexcept -> char* {
   if (dec_exp < 0) {
     memcpy(buffer, "0.0000000", 8);
     buffer = num_bits == 64 ? write_significand17(buffer + 1 - dec_exp, dec_sig,
-                                                  has17digits, dec_sig_div10)
+                                                  extra_digit, dec_sig_div10)
                             : write_significand9(buffer + 1 - dec_exp, dec_sig,
-                                                 has17digits);
+                                                 extra_digit);
     *buffer = '\0';
     return buffer;
   }
@@ -885,9 +885,9 @@ auto write_fixed(char* buffer, uint64_t dec_sig, int dec_exp, bool has17digits,
   write8(buffer + (num_bits == 64 ? 16 : 7), 0);
 
   char* start = buffer;
-  buffer = num_bits == 64 ? write_significand17(buffer, dec_sig, has17digits,
+  buffer = num_bits == 64 ? write_significand17(buffer, dec_sig, extra_digit,
                                                 dec_sig_div10)
-                          : write_significand9(buffer, dec_sig, has17digits);
+                          : write_significand9(buffer, dec_sig, extra_digit);
 
   // Branchless move to make space for the '.' without OOB accesses.
   char* part1 = start + dec_exp + (dec_exp < 2);
