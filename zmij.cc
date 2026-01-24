@@ -958,24 +958,23 @@ auto write(Float value, char* buffer) noexcept -> char* {
                                    bin_sig != 0);
   }
   int dec_exp = dec.exp;
+  constexpr uint64_t threshold = uint64_t(traits::num_bits == 64 ? 1e16 : 1e8);
+  bool extra_digit = dec.sig >= threshold;
+  dec_exp += traits::max_digits10 - 2 + extra_digit;
 
   // Write significand.
   char* start = buffer;
   if (traits::num_bits == 64) {
-    bool has17digits = dec.sig >= uint64_t(1e16);
-    dec_exp += traits::max_digits10 - 2 + has17digits;
     if (dec_exp >= -4 && dec_exp < compute_dec_exp(traits::digits + 1, true))
-      return write_fixed(buffer, dec.sig, dec_exp, has17digits, dec.sig_div10);
+      return write_fixed(buffer, dec.sig, dec_exp, extra_digit, dec.sig_div10);
     buffer =
-        write_significand17(buffer + 1, dec.sig, has17digits, dec.sig_div10);
+        write_significand17(buffer + 1, dec.sig, extra_digit, dec.sig_div10);
   } else {
     if (dec.sig < uint32_t(1e7)) [[ZMIJ_UNLIKELY]] {
       dec.sig *= 10;
       --dec_exp;
     }
-    bool has9digits = dec.sig >= uint32_t(1e8);
-    dec_exp += traits::max_digits10 - 2 + has9digits;
-    buffer = write_significand9(buffer + 1, dec.sig, has9digits);
+    buffer = write_significand9(buffer + 1, dec.sig, extra_digit);
   }
   start[0] = start[1];
   start[1] = '.';
