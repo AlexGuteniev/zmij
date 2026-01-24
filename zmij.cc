@@ -870,6 +870,38 @@ ZMIJ_INLINE auto to_decimal_normal(UInt bin_sig, int64_t raw_exp,
   return to_decimal_schubfach(bin_sig, bin_exp, regular);
 }
 
+auto write_fixed(char* buffer, uint64_t dec_sig, int dec_exp, bool has17digits,
+                 long long dec_sig_div10) noexcept -> char* {
+  if (dec_exp < 0) {
+    memcpy(buffer, "0.0000000", 8);
+    buffer = write_significand17(buffer + 1 - dec_exp, dec_sig, has17digits,
+                                 dec_sig_div10);
+    *buffer = '\0';
+    return buffer;
+  }
+
+  // Avoid reading uninitialized memory (would be unnecessary in asm).
+  write8(buffer + 16, 0);
+
+  char* start = buffer;
+  buffer = write_significand17(buffer, dec_sig, has17digits, dec_sig_div10);
+
+  // Branchless move to make space for the '.' without OOB accesses.
+  char* part1 = start + dec_exp + (dec_exp < 2);
+  char* part2 = part1 + (dec_exp < 2) + (dec_exp < 9 ? 7 : 0);
+  uint64_t value1 = read8(part1);
+  uint64_t value2 = read8(part2);
+  write8(part1 + 1, value1);
+  write8(part2 + 1, value2);
+
+  char* dot = start + dec_exp + 1;
+  *dot = '.';
+
+  buffer = buffer > dot ? buffer + 1 : dot;
+  *buffer = '\0';
+  return buffer;
+}
+
 }  // namespace
 
 namespace zmij {
@@ -932,39 +964,8 @@ auto write(Float value, char* buffer) noexcept -> char* {
   if (traits::num_bits == 64) {
     bool has17digits = dec.sig >= uint64_t(1e16);
     dec_exp += traits::max_digits10 - 2 + has17digits;
-
-    if (dec_exp >= -4 && dec_exp < 0) {
-      memcpy(buffer, "0.0000000", 8);
-      buffer = write_significand17(buffer + 1 - dec_exp, dec.sig, has17digits,
-                                   dec.sig_div10);
-      *buffer = '\0';
-      return buffer;
-    }
-
-    // Could merge this path with the scientific path, or increase the upper
-    // bound if this branch is bad on real world data.
-    if (dec_exp >= 0 && dec_exp < 16) {
-      // Avoid reading uninitialized memory (would be unnecessary in asm).
-      write8(buffer + 16, 0);
-
-      buffer = write_significand17(buffer, dec.sig, has17digits, dec.sig_div10);
-
-      // Branchless move to make space for the '.' without OOB accesses.
-      char* part1 = start + dec_exp + (dec_exp < 2);
-      char* part2 = part1 + (dec_exp < 2) + (dec_exp < 9 ? 7 : 0);
-      uint64_t value1 = read8(part1);
-      uint64_t value2 = read8(part2);
-      write8(part1 + 1, value1);
-      write8(part2 + 1, value2);
-
-      char* dot = start + dec_exp + 1;
-      *dot = '.';
-
-      buffer = buffer > dot ? buffer + 1 : dot;
-      *buffer = '\0';
-      return buffer;
-    }
-
+    if (dec_exp >= -4 && dec_exp < 16)
+      return write_fixed(buffer, dec.sig, dec_exp, has17digits, dec.sig_div10);
     buffer =
         write_significand17(buffer + 1, dec.sig, has17digits, dec.sig_div10);
   } else {
