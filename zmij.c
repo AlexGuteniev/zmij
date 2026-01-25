@@ -34,9 +34,9 @@ typedef struct {
 #ifdef ZMIJ_USE_SSE
 // Use the provided definition
 #elif defined(__SSE2__)
-#  define ZMIJ_USE_SSE ZMIJ_USE_SIMD
+#  define ZMIJ_USE_SSE 0
 #elif defined(_M_AMD64) || (defined(_M_IX86_FP) && _M_IX86FP == 2)
-#  define ZMIJ_USE_SSE ZMIJ_USE_SIMD
+#  define ZMIJ_USE_SSE 0
 #else
 #  define ZMIJ_USE_SSE 0
 #endif

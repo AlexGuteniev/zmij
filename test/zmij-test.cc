@@ -36,9 +36,11 @@ auto write(char* out, size_t n, float value) noexcept -> size_t {
 
 
 auto dtoa(double value) -> std::string {
-  char buffer[zmij::double_buffer_size] = {};
-  auto n = zmij::write(buffer, sizeof(buffer), value);
-  return {buffer, n};
+  char buffer[zmij::double_buffer_size + 1] = {};
+  memset(buffer, '?', sizeof(buffer));
+  auto n = zmij::write(buffer + 1, sizeof(buffer), value);
+  if (buffer[0] != '?') throw std::runtime_error("buffer underrun");
+  return {buffer + 1, n};
 }
 
 auto ftoa(float value) -> std::string {
@@ -233,6 +235,10 @@ TEST(dtoa_test, no_overrun) {
   EXPECT_EQ(buffer, std::string("-1.2345678901234567e+123"));
   EXPECT_EQ(buffer[zmij::double_buffer_size], '?');
   EXPECT_EQ(buffer[zmij::double_buffer_size - 1], '\0');
+}
+
+TEST(dtoa_test, no_underrun) {
+  dtoa(9.061488e+15);
 }
 
 TEST(ftoa_test, normal) {

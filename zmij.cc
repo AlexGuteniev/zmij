@@ -515,9 +515,10 @@ auto write_significand9(char* buffer, uint32_t value, bool has9digits) noexcept
 // normals) and removes trailing zeros.  The significant digits start
 // from buffer[1].  buffer[0] may contain '0' after this function if
 // the significand has length 16.
+template <bool use_sse = ZMIJ_USE_SSE != 0>
 auto write_significand17(char* buffer, uint64_t value, bool has17digits,
                          long long value_div10) noexcept -> char* {
-  if (!ZMIJ_USE_NEON && !ZMIJ_USE_SSE) {
+  if (!ZMIJ_USE_NEON && !use_sse) {
     // Digits/pairs of digits are denoted by letters: value = abbccddeeffgghhii.
     uint32_t abbccddee = uint32_t(value / 100'000'000);
     uint32_t ffgghhii = uint32_t(value % 100'000'000);
@@ -894,7 +895,7 @@ auto write_fixed(char* buffer, uint64_t dec_sig, int dec_exp, bool extra_digit,
   write8(buffer + (num_bits == 64 ? 16 : 7), 0);
 
   char* start = buffer;
-  buffer = num_bits == 64 ? write_significand17(buffer, dec_sig, extra_digit,
+  buffer = num_bits == 64 ? write_significand17<false>(buffer, dec_sig, extra_digit,
                                                 dec_sig_div10)
                           : write_significand9(buffer, dec_sig, extra_digit);
 
