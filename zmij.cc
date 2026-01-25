@@ -501,28 +501,24 @@ inline auto read8(char* buffer) noexcept -> uint64_t {
   return r;
 }
 
-// Writes a significand consisting of up to 9 decimal digits (7-9 for normals)
-// and removes trailing zeros.
-auto write_significand9(char* buffer, uint32_t value, bool has9digits) noexcept
-    -> char* {
-  buffer = write_if(buffer, value / 100'000'000, has9digits);
-  uint64_t bcd = to_bcd8(value % 100'000'000);
-  write8(buffer, bcd + zeros);
-  return buffer + count_trailing_nonzeros(bcd);
-}
-
-// Writes a significand consisting of up to 17 decimal digits (16-17 for
-// normals) and removes trailing zeros.  The significant digits start
-// from buffer[1].  buffer[0] may contain '0' after this function if
-// the significand has length 16.
-template <bool use_sse = ZMIJ_USE_SSE != 0>
-auto write_significand17(char* buffer, uint64_t value, bool has17digits,
-                         long long value_div10) noexcept -> char* {
+// Writes a significand and removes trailing zeros. value has up to 17 decimal
+// digits (16-17 for normals) for double (num_bits == 64) and up to 9 digits
+// (8-9 for normals) for float. The significant digits start from buffer[1].
+// buffer[0] may contain '0' after this function if the leading digit is zero.
+template <int num_bits, bool use_sse = ZMIJ_USE_SSE != 0 && num_bits == 64>
+auto write_significand(char* buffer, uint64_t value, bool extra_digit,
+                       long long value_div10) noexcept -> char* {
+  if (num_bits == 32) {
+    buffer = write_if(buffer, value / 100'000'000, extra_digit);
+    uint64_t bcd = to_bcd8(value % 100'000'000);
+    write8(buffer, bcd + zeros);
+    return buffer + count_trailing_nonzeros(bcd);
+  }
   if (!ZMIJ_USE_NEON && !use_sse) {
     // Digits/pairs of digits are denoted by letters: value = abbccddeeffgghhii.
     uint32_t abbccddee = uint32_t(value / 100'000'000);
     uint32_t ffgghhii = uint32_t(value % 100'000'000);
-    buffer = write_if(buffer, abbccddee / 100'000'000, has17digits);
+    buffer = write_if(buffer, abbccddee / 100'000'000, extra_digit);
     uint64_t bcd = to_bcd8(abbccddee % 100'000'000);
     write8(buffer, bcd + zeros);
     if (ffgghhii == 0) {
@@ -565,7 +561,7 @@ auto write_significand17(char* buffer, uint64_t value, bool has17digits,
   uint64_t a = uint64_t(umul128(abbccddee, c->mul_const) >> 90);
   uint64_t bbccddee = abbccddee - a * hundred_million;
 
-  buffer = write_if(buffer, a, has17digits);
+  buffer = write_if(buffer, a, extra_digit);
 
   uint64x1_t ffgghhii_bbccddee_64 = {(uint64_t(ffgghhii) << 32) | bbccddee};
   int32x2_t bbccddee_ffgghhii = vreinterpret_s32_u64(ffgghhii_bbccddee_64);
@@ -608,7 +604,7 @@ auto write_significand17(char* buffer, uint64_t value, bool has17digits,
   // We always write 17 digits into the buffer, but the first one can be zero.
   // buffer points to the second place in the output buffer to allow for the
   // insertion of the decimal point, so we can use the first place as scratch.
-  buffer += has17digits - 1;
+  buffer += extra_digit - 1;
   buffer[16] = char(last_digit + '0');
 
   uint32_t abcdefgh = value_div10 / uint64_t(1e8);
@@ -881,11 +877,9 @@ auto write_fixed(char* buffer, uint64_t dec_sig, int dec_exp, bool extra_digit,
                  long long dec_sig_div10) noexcept -> char* {
   if (dec_exp < 0) {
     char* point = buffer + 1;
-    memcpy(buffer, "0.0000000", 8);
-    buffer = num_bits == 64 ? write_significand17(buffer + 1 - dec_exp, dec_sig,
-                                                  extra_digit, dec_sig_div10)
-                            : write_significand9(buffer + 1 - dec_exp, dec_sig,
-                                                 extra_digit);
+    memcpy(buffer, "0.000000", 8);
+    buffer = write_significand<num_bits>(buffer + 1 - dec_exp, dec_sig,
+                                         extra_digit, dec_sig_div10);
     if (ZMIJ_USE_SSE) *point = '.';
     *buffer = '\0';
     return buffer;
@@ -895,9 +889,8 @@ auto write_fixed(char* buffer, uint64_t dec_sig, int dec_exp, bool extra_digit,
   write8(buffer + (num_bits == 64 ? 16 : 7), 0);
 
   char* start = buffer;
-  buffer = num_bits == 64 ? write_significand17<false>(buffer, dec_sig, extra_digit,
-                                                dec_sig_div10)
-                          : write_significand9(buffer, dec_sig, extra_digit);
+  buffer = write_significand<num_bits, false>(buffer, dec_sig, extra_digit,
+                                              dec_sig_div10);
 
   // Branchless move to make space for the '.' without OOB accesses.
   char* part1 = start + dec_exp + (dec_exp < 2);
@@ -989,12 +982,8 @@ auto write(Float value, char* buffer) noexcept -> char* {
                                          dec.sig_div10);
   }
   char* start = buffer;
-  if (traits::num_bits == 64) {
-    buffer =
-        write_significand17(buffer + 1, dec.sig, extra_digit, dec.sig_div10);
-  } else {
-    buffer = write_significand9(buffer + 1, dec.sig, extra_digit);
-  }
+  buffer = write_significand<traits::num_bits>(buffer + 1, dec.sig, extra_digit,
+                                               dec.sig_div10);
   start[0] = start[1];
   start[1] = '.';
   buffer -= (buffer - 1 == start + 1);  // Remove trailing point.
