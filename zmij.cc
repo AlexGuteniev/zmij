@@ -605,7 +605,7 @@ auto write_significand17(char* buffer, uint64_t value, bool has17digits,
   // We always write 17 digits into the buffer, but the first one can be zero.
   // buffer points to the second place in the output buffer to allow for the
   // insertion of the decimal point, so we can use the first place as scratch.
-  buffer += has17digits;
+  buffer += has17digits - 1;
   buffer[16] = char(last_digit + '0');
 
   uint32_t abcdefgh = value_div10 / uint64_t(1e8);
@@ -872,11 +872,13 @@ template <int num_bits>
 auto write_fixed(char* buffer, uint64_t dec_sig, int dec_exp, bool extra_digit,
                  long long dec_sig_div10) noexcept -> char* {
   if (dec_exp < 0) {
+    char* point = buffer + 1;
     memcpy(buffer, "0.0000000", 8);
     buffer = num_bits == 64 ? write_significand17(buffer + 1 - dec_exp, dec_sig,
                                                   extra_digit, dec_sig_div10)
                             : write_significand9(buffer + 1 - dec_exp, dec_sig,
                                                  extra_digit);
+    if (ZMIJ_USE_SSE) *point = '.';
     *buffer = '\0';
     return buffer;
   }
