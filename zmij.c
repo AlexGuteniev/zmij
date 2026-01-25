@@ -1662,7 +1662,7 @@ char* zmij_write_double(double value, char* buffer) {
     char* point = buffer + 1;
     memcpy(buffer, "0.0000000", 8);
     buffer = write_significand17(buffer + 1 - dec_exp, dec.sig, has17digits,
-                                  sig_div10);
+                                 sig_div10);
     if (ZMIJ_USE_SSE) *point = '.';
     *buffer = '\0';
     return buffer;
@@ -1692,8 +1692,7 @@ char* zmij_write_double(double value, char* buffer) {
     return buffer;
   }
 
-  buffer =
-      write_significand17(buffer + 1, dec.sig, has17digits, sig_div10);
+  buffer = write_significand17(buffer + 1, dec.sig, has17digits, sig_div10);
   start[0] = start[1];
   start[1] = '.';
   buffer -= (buffer - 1 == start + 1);  // Remove trailing point.
