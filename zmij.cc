@@ -531,17 +531,16 @@ auto write_significand(char* buffer, uint64_t value, bool extra_digit,
   }
 #if ZMIJ_USE_NEON
   // An optimized version for NEON by Dougall Johnson.
-  constexpr int32_t neg10k = -10000 + 0x10000;
   using int32x4 = std::conditional_t<ZMIJ_MSC_VER != 0, int32_t[4], int32x4_t>;
   using int16x8 = std::conditional_t<ZMIJ_MSC_VER != 0, int16_t[8], int16x8_t>;
-  struct mul_constants {
+  constexpr int32_t neg10k = -10000 + 0x10000;
+  alignas(64) static constexpr struct {
     uint64_t mul_const = 0xabcc77118461cefd;
     uint64_t hundred_million = 100000000;
     int32x4 multipliers32 = {div10k_sig, neg10k, div100_sig << 12, neg100};
     int16x8 multipliers16 = {0xce0, neg10};
-  };
-  static const mul_constants constants;
-  const mul_constants* c = &constants;
+  } consts;
+  const auto* c = &consts;
 
   // Compiler barrier, or clang doesn't load from memory and generates 15 more
   // instructions.
@@ -610,7 +609,7 @@ auto write_significand(char* buffer, uint64_t value, bool extra_digit,
   uint32_t abcdefgh = value_div10 / uint64_t(1e8);
   uint32_t ijklmnop = value_div10 % uint64_t(1e8);
 
-  alignas(64) static constexpr struct constants {
+  alignas(64) static constexpr struct {
     static constexpr auto splat64(uint64_t x) -> uint128 { return {x, x}; }
     static constexpr auto splat32(uint32_t x) -> uint128 {
       return splat64(uint64_t(x) << 32 | x);
@@ -641,11 +640,8 @@ auto write_significand(char* buffer, uint64_t value, bool extra_digit,
 #  endif
     uint128 zeros = splat64(::zeros);
   } consts;
-
-  const constants* c = &consts;
-  // Make the compiler forget where the constants came from to ensure they are
-  // loaded from memory.
-  ZMIJ_ASM(("" : "+r"(c)));
+  const auto* c = &consts;
+  ZMIJ_ASM(("" : "+r"(c)));  // Load constants from memory.
 
   using ptr = const __m128i*;
   const __m128i div10k = _mm_load_si128(ptr(&c->div10k));
