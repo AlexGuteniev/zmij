@@ -748,8 +748,7 @@ ZMIJ_INLINE auto to_decimal_schubfach(UInt bin_sig, int64_t bin_exp,
 
   // The idea of using a single shorter candidate is by Cassio Neri.
   // It is less or equal to the upper bound by construction.
-  long long div10 = (upper >> bound_shift) / 10;
-  UInt shorter = div10 * 10;
+  UInt shorter = ((upper >> bound_shift) / 10) * 10;
   if ((shorter << bound_shift) >= lower) return {int64_t(shorter), dec_exp};
 
   UInt scaled_sig =
