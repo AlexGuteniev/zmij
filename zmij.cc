@@ -68,6 +68,12 @@ static_assert(!ZMIJ_USE_SSE4_1 || ZMIJ_USE_SSE);
 #  define ZMIJ_AARCH64 0
 #endif
 
+#ifdef __x86_64__
+#  define ZMIJ_X86_64 1
+#else
+#  define ZMIJ_X86_64 0
+#endif
+
 #ifdef _MSC_VER
 #  define ZMIJ_MSC_VER _MSC_VER
 #  include <intrin.h>  // __lzcnt64/_umul128/__umulh
@@ -169,6 +175,18 @@ inline auto clz(uint64_t x) noexcept -> int {
   for (; x > 0; x >>= 1) --n;
   return n;
 #endif
+}
+
+// Returns true_value if condition != 0, else false_value, without branching.
+ZMIJ_INLINE auto select(uint64_t condition, int64_t true_value,
+                        int64_t false_value) -> int64_t {
+  if (!ZMIJ_X86_64) return condition ? true_value : false_value;
+  ZMIJ_ASM(
+      volatile("test %2, %2\n\t"
+               "cmovne %1, %0\n\t" :  //
+               "+r"(false_value) : "r"(true_value),
+               "r"(condition) : "cc"));
+  return false_value;
 }
 
 struct uint128 {
@@ -834,13 +852,9 @@ ZMIJ_INLINE auto to_decimal_fast(UInt bin_sig, int64_t raw_exp,
     bool round_up = upper >= ten;
     int64_t shorter = int64_t(integral - digit);
     int64_t longer = int64_t(integral + (cmp >= 0));
-    if (ZMIJ_AARCH64) {  // Faster version without ccmp.
-      int64_t dec_sig = scaled_sig_mod10 < scaled_half_ulp ? shorter : longer;
-      return {round_up ? shorter + 10 : dec_sig, dec_exp};
-    }
-    shorter += round_up * 10;
-    bool use_shorter = (scaled_sig_mod10 <= scaled_half_ulp) + round_up != 0;
-    return {use_shorter ? shorter : longer, dec_exp};
+    int64_t dec_sig =
+        select(scaled_sig_mod10 < scaled_half_ulp, shorter, longer);
+    return {select(round_up, shorter + 10, dec_sig), dec_exp};
   }
   return to_decimal_schubfach(bin_sig, bin_exp, regular);
 }
@@ -874,10 +888,10 @@ auto write_fixed(char* buffer, uint64_t dec_sig, int dec_exp,
     write8(part1 + 1, read8(part1));
   }
 
-  char* dot = start + dec_exp + 1;
-  *dot = '.';
+  char* point = start + dec_exp + 1;
+  *point = '.';
 
-  buffer = buffer > dot ? buffer + 1 : dot;
+  buffer = buffer > point ? buffer + 1 : point;
   *buffer = '\0';
   return buffer;
 }
@@ -946,9 +960,8 @@ auto write(Float value, char* buffer) noexcept -> char* {
   }
 
   // Write significand.
-  if (dec_exp >= -4 && dec_exp < compute_dec_exp(traits::digits + 1)) {
+  if (dec_exp >= -4 && dec_exp < compute_dec_exp(traits::digits + 1))
     return write_fixed<traits::num_bits>(buffer, dec.sig, dec_exp, extra_digit);
-  }
   char* start = buffer;
   buffer =
       write_significand<traits::num_bits>(buffer + 1, dec.sig, extra_digit);
