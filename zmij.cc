@@ -594,9 +594,7 @@ ZMIJ_INLINE auto write_significand(char* buffer, uint64_t value,
       vreinterpretq_u16_u8(vcgtzq_s8(vreinterpretq_s8_u8(digits)));
   uint64_t zeroes =
       vget_lane_u64(vreinterpret_u64_u8(vshrn_n_u16(is_not_zero, 4)), 0);
-
-  buffer += 16 - ((zeroes != 0 ? clz(zeroes) : 64) >> 2);
-  return buffer;
+  return buffer + (16 - ((zeroes != 0 ? clz(zeroes) : 64) >> 2));
 #elif ZMIJ_USE_SSE
   uint32_t abbccddee = uint32_t(value / 100'000'000);
   uint32_t ffgghhii = uint32_t(value % 100'000'000);
@@ -851,11 +849,9 @@ template <int num_bits>
 auto write_fixed(char* buffer, uint64_t dec_sig, int dec_exp,
                  bool extra_digit) noexcept -> char* {
   if (dec_exp < 0) {
-    char* point = buffer + 1;
     memcpy(buffer, "0.000000", 8);
     buffer =
         write_significand<num_bits>(buffer + 1 - dec_exp, dec_sig, extra_digit);
-    if (ZMIJ_USE_SSE) *point = '.';
     *buffer = '\0';
     return buffer;
   }
