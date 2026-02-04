@@ -29,7 +29,7 @@ struct dec_fp {
 
 /// Converts `value` into the shortest correctly rounded decimal representation.
 /// Usage:
-///   auto [sig, exp] = to_decimal(6.62607015e-34);
+///   auto [sig, exp, negative] = to_decimal(6.62607015e-34);
 auto to_decimal(double value) noexcept -> dec_fp;
 
 enum {
