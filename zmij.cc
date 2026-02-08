@@ -352,8 +352,8 @@ struct pow10_significands_table {
   ZMIJ_CONSTEXPR auto operator[](int dec_exp) const noexcept -> uint128 {
     constexpr int dec_exp_min = -292;
     if (compress) {
+      // Compressed version using only 672 bytes of data.
       unsigned i = dec_exp - dec_exp_min;
-      // 672 bytes of data
       static const uint64_t pow10s[28] = {
           0x8000000000000000, 0xa000000000000000, 0xc800000000000000,
           0xfa00000000000000, 0x9c40000000000000, 0xc350000000000000,
