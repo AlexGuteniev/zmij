@@ -11,6 +11,7 @@ with implementations in C and C++
 * Shortest decimal representation
 * Correct rounding
 * High [performance](#performance)
+* Small binary size
 * Fast [compile time](#compile-time)
 * IEEE 754 `double` and `float` support
 * Safer API than classic `dtoa`
