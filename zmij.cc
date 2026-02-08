@@ -337,51 +337,81 @@ constexpr auto floor_log2_pow10(int e) noexcept -> int {
   return e * 1741647 >> 19;
 }
 
-constexpr uint64_t powers_of_5[] = {
-    0x0000000000000001, 0x0000000000000005, 0x0000000000000019,
-    0x000000000000007d, 0x0000000000000271, 0x0000000000000c35,
-    0x0000000000003d09, 0x000000000001312d, 0x000000000005f5e1,
-    0x00000000001dcd65, 0x00000000009502f9, 0x0000000002e90edd,
-    0x000000000e8d4a51, 0x0000000048c27395, 0x000000016bcc41e9,
-    0x000000071afd498d, 0x0000002386f26fc1, 0x000000b1a2bc2ec5,
-    0x000003782dace9d9, 0x00001158e460913d, 0x000056bc75e2d631,
-    0x0001b1ae4d6e2ef5, 0x000878678326eac9, 0x002a5a058fc295ed,
-    0x00d3c21bcecceda1, 0x0422ca8b0a00a425, 0x14adf4b7320334b9};
-
 // 128-bit significands of powers of 10 rounded down.
 // Generated using 192-bit arithmetic method by Dougall Johnson.
 struct pow10_significands_table {
   static constexpr bool compress = ZMIJ_OPTIMIZE_SIZE != 0;
   static constexpr bool split_tables = !compress && ZMIJ_AARCH64 != 0;
   static constexpr int num_pow10 = 617;
-  static constexpr int compression_ratio = compress ? 27 : 1;
-  uint64_t data[(num_pow10 / compression_ratio + compress) * 2] = {};
+  uint64_t data[compress ? 1 : num_pow10 * 2] = {};
 
   ZMIJ_CONSTEXPR auto operator[](int dec_exp) const noexcept -> uint128 {
     constexpr int dec_exp_min = -292;
     if (compress) {
-      int base_index = (dec_exp - dec_exp_min) / compression_ratio;
-      int base_dec_exp = base_index * compression_ratio + dec_exp_min;
-      int offset = dec_exp - base_dec_exp;
+      unsigned i = dec_exp - dec_exp_min;
+      // 672 bytes of data
+      static const uint64_t pow10s[28] = {
+          0x8000000000000000, 0xa000000000000000, 0xc800000000000000,
+          0xfa00000000000000, 0x9c40000000000000, 0xc350000000000000,
+          0xf424000000000000, 0x9896800000000000, 0xbebc200000000000,
+          0xee6b280000000000, 0x9502f90000000000, 0xba43b74000000000,
+          0xe8d4a51000000000, 0x9184e72a00000000, 0xb5e620f480000000,
+          0xe35fa931a0000000, 0x8e1bc9bf04000000, 0xb1a2bc2ec5000000,
+          0xde0b6b3a76400000, 0x8ac7230489e80000, 0xad78ebc5ac620000,
+          0xd8d726b7177a8000, 0x878678326eac9000, 0xa968163f0a57b400,
+          0xd3c21bcecceda100, 0x84595161401484a0, 0xa56fa5b99019a5c8,
+          0xcecb8f27f4200f3a,
+      };
 
-      uint64_t base_hi = data[base_index * 2];
-      uint64_t base_lo = data[base_index * 2 + 1];
-      if (offset == 0) return {base_hi, base_lo};
+      static const uint128 high_parts[23] = {
+          {0xaf8e5410288e1b6f, 0x07ecf0ae5ee44dda},
+          {0xb1442798f49ffb4a, 0x99cd11cfdf41779d},
+          {0xb2fe3f0b8599ef07, 0x861fa7e6dcb4aa15},
+          {0xb4bca50b065abe63, 0x0fed077a756b53aa},
+          {0xb67f6455292cbf08, 0x1a3bc84c17b1d543},
+          {0xb84687c269ef3bfb, 0x3d5d514f40eea742},
+          {0xba121a4650e4ddeb, 0x92f34d62616ce413},
+          {0xbbe226efb628afea, 0x890489f70a55368c},
+          {0xbdb6b8e905cb600f, 0x5400e987bbc1c921},
+          {0xbf8fdb78849a5f96, 0xde98520472bdd034},
+          {0xc16d9a0095928a27, 0x75b7053c0f178294},
+          {0xc350000000000000, 0x0000000000000000},
+          {0xc5371912364ce305, 0x6c28000000000000},
+          {0xc722f0ef9d80aad6, 0x424d3ad2b7b97ef6},
+          {0xc913936dd571c84c, 0x03bc3a19cd1e38ea},
+          {0xcb090c8001ab551c, 0x5cadf5bfd3072cc6},
+          {0xcd036837130890a1, 0x36dba887c37a8c10},
+          {0xcf02b2c21207ef2e, 0x94f967e45e03f4bc},
+          {0xd106f86e69d785c7, 0xe13336d701beba52},
+          {0xd31045a8341ca07c, 0x1ede48111209a051},
+          {0xd51ea6fa85785631, 0x552a74227f3ea566},
+          {0xd732290fbacaf133, 0xa97c177947ad4096},
+          {0xd94ad8b1c7380874, 0x18375281ae7822bc},
+      };
 
-      int shift = floor_log2_pow10(base_dec_exp + offset) -
-                  floor_log2_pow10(base_dec_exp) - offset;
+      uint32_t fixups[20] = {0x05271b1f, 0x00000c20, 0x00003200, 0x12100020,
+                             0x00000000, 0x06000000, 0xc16409c0, 0xaf26700f,
+                             0xeb987b07, 0x0000000d, 0x00000000, 0x66fbfffe,
+                             0xb74100ec, 0xa0669fe8, 0xedb21280, 0x00000686,
+                             0x0a021200, 0x29b89c20, 0x08bc0eda, 0x00000000};
 
-      uint64_t pow5 = powers_of_5[offset];
-      uint128_t p_hi = umul128(base_hi, pow5);
-      uint128_t p_lo = umul128(base_lo, pow5);
+      uint64_t m = pow10s[(i + 11) % 28];
+      uint128 h = high_parts[(i + 11) / 28];
 
-      uint64_t r_hi = uint64_t(p_hi >> 64);
-      uint64_t r_lo = uint64_t(p_hi) + uint64_t(p_lo >> 64);
-      if (r_lo < uint64_t(p_hi)) ++r_hi;
+      uint64_t h1 = umul128_hi64(h.lo, m);
 
-      uint64_t lo = ((uint64_t(p_lo) >> shift) | (r_lo << (64 - shift))) + 1;
-      uint64_t hi = (r_lo >> shift) | (r_hi << (64 - shift));
-      return {lo != 0 ? hi : hi + 1, lo};
+      uint64_t c0 = h.lo * m;
+      uint64_t c1 = h1 + h.hi * m;
+      uint64_t c2 = (c1 < h1) + umul128_hi64(h.hi, m);
+
+      uint128 result;
+      if (c2 >> 63)
+        result = uint128{c2, c1};
+      else
+        result = uint128{(c2 << 1) | (c1 >> 63), (c1 << 1) | (c0 >> 63)};
+
+      result.lo -= (fixups[i >> 5] >> (i & 31)) & 1;
+      return result;
     }
     if (!split_tables) {
       int index = (dec_exp - dec_exp_min) * 2;
@@ -406,16 +436,13 @@ struct pow10_significands_table {
     uint192 current = {0xe000000000000000, 0x25e8e89c13bb0f7a,
                        0xff77b1fcbebcdc4f};
     uint64_t ten = 0xa000000000000000;
-    for (int i = 0; i < num_pow10; ++i) {
-      if (i % compression_ratio == 0) {
-        int index = i / compression_ratio;
-        if (split_tables) {
-          data[num_pow10 - index - 1] = current.w2;
-          data[num_pow10 * 2 - index - 1] = current.w1;
-        } else {
-          data[index * 2] = current.w2;
-          data[index * 2 + 1] = current.w1;
-        }
+    for (int i = 0; i < num_pow10 && !compress; ++i) {
+      if (split_tables) {
+        data[num_pow10 - i - 1] = current.w2;
+        data[num_pow10 * 2 - i - 1] = current.w1;
+      } else {
+        data[i * 2] = current.w2;
+        data[i * 2 + 1] = current.w1;
       }
 
       uint64_t h0 = umul128_hi64(current.w0, ten);
