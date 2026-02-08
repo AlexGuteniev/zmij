@@ -338,7 +338,7 @@ constexpr auto floor_log2_pow10(int e) noexcept -> int {
 }
 
 // 128-bit significands of powers of 10 rounded down.
-// Generated using 192-bit arithmetic method by Dougall Johnson.
+// Generation with 192-bit arithmetic and compression by Dougall Johnson.
 struct pow10_significands_table {
   static constexpr bool compress = ZMIJ_OPTIMIZE_SIZE != 0;
   static constexpr bool split_tables = !compress && ZMIJ_AARCH64 != 0;
@@ -404,12 +404,9 @@ struct pow10_significands_table {
       uint64_t c1 = h1 + h.hi * m;
       uint64_t c2 = (c1 < h1) + umul128_hi64(h.hi, m);
 
-      uint128 result;
-      if (c2 >> 63)
-        result = uint128{c2, c1};
-      else
-        result = uint128{(c2 << 1) | (c1 >> 63), (c1 << 1) | (c0 >> 63)};
-
+      uint128 result = (c2 >> 63) != 0
+                           ? uint128{c2, c1}
+                           : uint128{c2 << 1 | c1 >> 63, c1 << 1 | c0 >> 63};
       result.lo -= (fixups[i >> 5] >> (i & 31)) & 1;
       return result;
     }
