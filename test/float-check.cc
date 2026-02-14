@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>  // std::fabs
 #include <thread>
 #include <vector>
 
@@ -54,7 +55,7 @@ auto main() -> int {
         memcpy(&value, &bits, sizeof(float));
 
         zmij::write(actual, sizeof(actual), value);
-        auto dec = jkj::dragonbox::to_decimal(fabs(value));
+        auto dec = jkj::dragonbox::to_decimal(std::fabs(value));
         int exp = dec.exponent + fmt::detail::count_digits(dec.significand) - 1;
         if (exp >= -4 && exp < 7) {
           // Dragonbox only support exponential format so handle fixed
