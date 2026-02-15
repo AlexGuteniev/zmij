@@ -15,16 +15,16 @@
 #include <stdint.h>   // uint64_t
 #include <string.h>   // memcpy
 
-#ifndef ZMIJ_USE_SIMD
-#  if defined(__cplusplus)
-#    define ZMIJ_USE_SIMD 1
-#  else
-#    define ZMIJ_USE_SIMD 0
-#  endif
+#ifdef ZMIJ_USE_SIMD
+// Use the provided definition.
+#elif defined(_MSC_VER)
+#  define ZMIJ_USE_SIMD 0
+#else
+#  define ZMIJ_USE_SIMD 1
 #endif
 
 #ifdef ZMIJ_USE_NEON
-// Use the provided definition
+// Use the provided definition.
 #elif defined(__ARM_NEON) || defined(_M_ARM64)
 #  define ZMIJ_USE_NEON ZMIJ_USE_SIMD
 #else
@@ -35,7 +35,7 @@
 #endif
 
 #ifdef ZMIJ_USE_SSE
-// Use the provided definition
+// Use the provided definition.
 #elif defined(__SSE2__)
 #  define ZMIJ_USE_SSE ZMIJ_USE_SIMD
 #elif defined(_M_AMD64) || (defined(_M_IX86_FP) && _M_IX86FP == 2)
@@ -48,7 +48,7 @@
 #endif
 
 #ifdef ZMIJ_USE_SSE4_1
-// Use the provided definition
+// Use the provided definition.
 static_assert(!ZMIJ_USE_SSE4_1 || ZMIJ_USE_SSE);
 #elif defined(__SSE4_1__) || defined(__AVX__)
 // On MSVC there's no way to check for SSE4.1 specifically so check __AVX__.
@@ -115,7 +115,7 @@ static_assert(!ZMIJ_USE_SSE4_1 || ZMIJ_USE_SSE);
 #endif
 
 #if defined(ZMIJ_ALIGNAS)
-// Use the provided definition
+// Use the provided definition.
 #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
 #  define ZMIJ_ALIGNAS(x) _Alignas(x)
 #elif ZMIJ_MSC_VER
@@ -158,8 +158,8 @@ static inline int clz(uint64_t x) {
 #elif ZMIJ_MSC_VER
   // Fallback to the 32-bit BSR instruction.
   unsigned long idx;
-  if (_BitScanReverse(&idx, uint32_t(x >> 32))) return 31 - idx;
-  _BitScanReverse(&idx, uint32_t(x));
+  if (_BitScanReverse(&idx, (uint32_t)(x >> 32))) return 31 - idx;
+  _BitScanReverse(&idx, (uint32_t)x);
   return 63 - idx;
 #else
   int n = 64;
@@ -1316,7 +1316,7 @@ static char* write_significand17(char* buffer, uint64_t value, bool has17digits,
   // is the last digit which we factored off. But in that case the number would
   // be printed with a different exponent that shifts the last digit into the
   // first position.
-  size_t len = ((size_t)64) - clz(mask);  // size_t for native arithmetic
+  size_t len = (size_t)64 - clz(mask);  // size_t for native arithmetic
 
   _mm_storeu_si128((__m128i*)buffer, digits);
   return buffer + (last_digit != 0 ? 17 : len);
