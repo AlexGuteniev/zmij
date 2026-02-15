@@ -16,7 +16,11 @@
 #include <string.h>   // memcpy
 
 #ifndef ZMIJ_USE_SIMD
-#  define ZMIJ_USE_SIMD 1
+#  if defined(__cplusplus)
+#    define ZMIJ_USE_SIMD 1
+#  else
+#    define ZMIJ_USE_SIMD 0
+#  endif
 #endif
 
 #ifdef ZMIJ_USE_NEON
@@ -91,7 +95,7 @@ static_assert(!ZMIJ_USE_SSE4_1 || ZMIJ_USE_SSE);
 #endif
 
 #if ZMIJ_HAS_CPP_ATTRIBUTE(maybe_unused)
-#  define ZMIJ_MAYBE_UNUSED maybe_unused
+#  define ZMIJ_MAYBE_UNUSED [[maybe_unused]]
 #else
 #  define ZMIJ_MAYBE_UNUSED
 #endif
@@ -108,6 +112,18 @@ static_assert(!ZMIJ_USE_SSE4_1 || ZMIJ_USE_SSE);
 #  define ZMIJ_ASM(x) asm x
 #else
 #  define ZMIJ_ASM(x)
+#endif
+
+#if defined(ZMIJ_ALIGNAS)
+// Use the provided definition
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#  define ZMIJ_ALIGNAS(x) _Alignas(x)
+#elif ZMIJ_MSC_VER
+#  define ZMIJ_ALIGNAS(x) __declspec(align(x))
+#elif __GNUC__
+#  define ZMIJ_ALIGNAS(x) __attribute__((aligned(x)))
+#else
+#  define ZMIJ_ALIGNAS(x)
 #endif
 
 static inline bool is_big_endian() {
@@ -157,12 +173,11 @@ typedef struct {
   uint64_t lo;
 } uint128;
 
-[[ZMIJ_MAYBE_UNUSED]] static inline uint64_t uint128_to_uint64(uint128 u) {
+ZMIJ_MAYBE_UNUSED static inline uint64_t uint128_to_uint64(uint128 u) {
   return u.lo;
 }
 
-[[ZMIJ_MAYBE_UNUSED]] static inline uint128 uint128_add(uint128 lhs,
-                                                        uint128 rhs) {
+ZMIJ_MAYBE_UNUSED static inline uint128 uint128_add(uint128 lhs, uint128 rhs) {
 #ifdef _M_AMD64
   uint64_t lo, hi;
   _addcarry_u64(_addcarry_u64(0, lhs.lo, rhs.lo, &lo), lhs.hi, rhs.hi, &hi);
@@ -189,8 +204,8 @@ typedef unsigned __int128 uint128_t;
 typedef uint128 uint128_t;
 #endif  // ZMIJ_USE_INT128
 
-[[ZMIJ_MAYBE_UNUSED]] static inline uint128_t uint128_rshift(uint128_t u,
-                                                             int shift) {
+ZMIJ_MAYBE_UNUSED static inline uint128_t uint128_rshift(uint128_t u,
+                                                         int shift) {
 #if ZMIJ_USE_INT128
   return u >> shift;
 #else
@@ -229,18 +244,18 @@ static uint128_t umul128(uint64_t x, uint64_t y) {
   }
 #  endif
   uint64_t a = x >> 32;
-  uint64_t b = uint32_t(x);
+  uint64_t b = (uint32_t)x;
   uint64_t c = y >> 32;
-  uint64_t d = uint32_t(y);
+  uint64_t d = (uint32_t)y;
 
   uint64_t ac = a * c;
   uint64_t bc = b * c;
   uint64_t ad = a * d;
   uint64_t bd = b * d;
 
-  uint64_t cs = (bd >> 32) + uint32_t(ad) + uint32_t(bc);  // cross sum
+  uint64_t cs = (bd >> 32) + (uint32_t)ad + (uint32_t)bc;  // cross sum
   uint128 result = {ac + (ad >> 32) + (bc >> 32) + (cs >> 32),
-                    (cs << 32) + uint32_t(bd)};
+                    (cs << 32) + (uint32_t)bd};
   return result;
 #endif  // ZMIJ_USE_INT128
 }
@@ -286,13 +301,14 @@ uint32_t umulhi_inexact_to_odd32(uint64_t x_hi, uint64_t _, uint32_t y) {
   return (uint32_t)(p >> 32) | (((uint32_t)p >> 1) != 0);
 }
 
-static const int double_num_bits = 64;
-static const int double_num_sig_bits = DBL_MANT_DIG - 1;
-static const int double_num_exp_bits =
-    double_num_bits - double_num_sig_bits - 1;
-static const int double_exp_mask = (1 << double_num_exp_bits) - 1;
-static const int double_exp_bias = (1 << (double_num_exp_bits - 1)) - 1;
-static const int double_exp_offset = double_exp_bias + double_num_sig_bits;
+enum {
+  double_num_bits = 64,
+  double_num_sig_bits = DBL_MANT_DIG - 1,
+  double_num_exp_bits = double_num_bits - double_num_sig_bits - 1,
+  double_exp_mask = (1 << double_num_exp_bits) - 1,
+  double_exp_bias = (1 << (double_num_exp_bits - 1)) - 1,
+  double_exp_offset = double_exp_bias + double_num_sig_bits,
+};
 
 typedef uint64_t double_sig_type;
 static const double_sig_type double_implicit_bit = (double_sig_type)1
@@ -314,12 +330,14 @@ static int64_t double_get_exp(double_sig_type bits) {
   return (int64_t)((bits << 1) >> (double_num_sig_bits + 1));
 }
 
-static const int float_num_bits = 32;
-static const int float_num_sig_bits = FLT_MANT_DIG - 1;
-static const int float_num_exp_bits = float_num_bits - float_num_sig_bits - 1;
-static const int float_exp_mask = (1 << float_num_exp_bits) - 1;
-static const int float_exp_bias = (1 << (float_num_exp_bits - 1)) - 1;
-static const int float_exp_offset = float_exp_bias + float_num_sig_bits;
+enum {
+  float_num_bits = 32,
+  float_num_sig_bits = FLT_MANT_DIG - 1,
+  float_num_exp_bits = float_num_bits - float_num_sig_bits - 1,
+  float_exp_mask = (1 << float_num_exp_bits) - 1,
+  float_exp_bias = (1 << (float_num_exp_bits - 1)) - 1,
+  float_exp_offset = float_exp_bias + float_num_sig_bits,
+};
 
 typedef uint32_t float_sig_type;
 static const float_sig_type float_implicit_bit = (float_sig_type)1
@@ -342,7 +360,8 @@ static int64_t float_get_exp(float_sig_type bits) {
 }
 
 // 128-bit significands of powers of 10 rounded down.
-_Alignas(64) const uint128 pow10_significands_data[] = {
+ZMIJ_ALIGNAS(64)
+const uint128 pow10_significands_data[] = {
     {0xff77b1fcbebcdc4f, 0x25e8e89c13bb0f7a},  // -292
     {0x9faacf3df73609b1, 0x77b191618c54e9ac},  // -291
     {0xc795830d75038c1d, 0xd59df5b9ef6a2417},  // -290
@@ -1021,7 +1040,8 @@ static inline int count_trailing_nonzeros(uint64_t x) {
 static inline const char* digits2(size_t value) {
   // Align data since unaligned access may be slower when crossing a
   // hardware-specific boundary.
-  _Alignas(2) static const char data[] =
+  ZMIJ_ALIGNAS(2)
+  static const char data[] =
       "0001020304050607080910111213141516171819"
       "2021222324252627282930313233343536373839"
       "4041424344454647484950515253545556575859"
@@ -1030,13 +1050,19 @@ static inline const char* digits2(size_t value) {
   return &data[value * 2];
 }
 
-static const int div10k_exp = 40;
+enum {
+  div10k_exp = 40,
+};
 static const uint32_t div10k_sig = (uint32_t)((1ull << div10k_exp) / 10000 + 1);
 static const uint32_t neg10k = (uint32_t)((1ull << 32) - 10000);
-static const int div100_exp = 19;
+enum {
+  div100_exp = 19,
+};
 static const uint32_t div100_sig = (1 << div100_exp) / 100 + 1;
 static const uint32_t neg100 = (1 << 16) - 100;
-static const int div10_exp = 10;
+enum {
+  div10_exp = 10,
+};
 static const uint32_t div10_sig = (1 << div10_exp) / 10 + 1;
 static const uint32_t neg10 = (1 << 8) - 10;
 
@@ -1221,12 +1247,12 @@ static char* write_significand17(char* buffer, uint64_t value, bool has17digits,
   // buffer points to the second place in the output buffer to allow for the
   // insertion of the decimal point, so we can use the first place as scratch.
   buffer += has17digits - 1;
-  buffer[16] = char(last_digit + '0');
+  buffer[16] = (char)(last_digit + '0');
 
-  uint32_t abcdefgh = value_div10 / uint64_t(1e8);
-  uint32_t ijklmnop = value_div10 % uint64_t(1e8);
+  uint32_t abcdefgh = value_div10 / (uint64_t)1e8;
+  uint32_t ijklmnop = value_div10 % (uint64_t)1e8;
 
-  alignas(64) static const struct {
+  ZMIJ_ALIGNAS(64) static const struct {
     m128i div10k = splat64(div10k_sig);
     m128i neg10k = splat64(::neg10k);
     m128i div100 = splat32(div100_sig);
@@ -1280,7 +1306,7 @@ static char* write_significand17(char* buffer, uint64_t value, bool has17digits,
   __m128i bcd = _mm_shuffle_epi32(bcd_shuffled, _MM_SHUFFLE(0, 1, 2, 3));
 #  endif  // ZMIJ_USE_SSE4_1
 
-  auto digits = _mm_or_si128(bcd, zeros);
+  __m128i digits = _mm_or_si128(bcd, zeros);
 
   // determine number of leading zeros
   __m128i mask128 = _mm_cmpgt_epi8(bcd, _mm_setzero_si128());
@@ -1290,9 +1316,9 @@ static char* write_significand17(char* buffer, uint64_t value, bool has17digits,
   // is the last digit which we factored off. But in that case the number would
   // be printed with a different exponent that shifts the last digit into the
   // first position.
-  auto len = size_t(64) - clz(mask);  // size_t for native arithmetic
+  size_t len = ((size_t)64) - clz(mask);  // size_t for native arithmetic
 
-  _mm_storeu_si128(reinterpret_cast<__m128i*>(buffer), digits);
+  _mm_storeu_si128((__m128i*)buffer, digits);
   return buffer + (last_digit != 0 ? 17 : len);
 #endif    // ZMIJ_USE_SSE
 }
