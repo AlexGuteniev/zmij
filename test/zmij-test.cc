@@ -226,7 +226,6 @@ TEST(dtoa_test, no_overrun) {
   auto n = zmij::write(buffer, zmij::double_buffer_size, -1.2345678901234567e+123);
   EXPECT_EQ(std::string(buffer, n), std::string("-1.2345678901234567e+123"));
   EXPECT_EQ(buffer[zmij::double_buffer_size], '?');
-  //EXPECT_EQ(buffer[zmij::double_buffer_size - 1], '?');
 }
 
 TEST(dtoa_test, no_underrun) {
@@ -249,7 +248,6 @@ TEST(ftoa_test, no_overrun) {
   auto n = zmij::write(buffer, zmij::float_buffer_size, -1.00000005e+15f);
   EXPECT_EQ(std::string(buffer, n), std::string("-1.00000005e+15"));
   EXPECT_EQ(buffer[zmij::float_buffer_size], '?');
-  //EXPECT_EQ(buffer[zmij::float_buffer_size - 1], '?');
 }
 
 auto main(int argc, char** argv) -> int {
